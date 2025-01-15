@@ -22,35 +22,40 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.PersistableBundle
 import android.provider.DocumentsContract
 import android.webkit.MimeTypeMap
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
+import com.perol.pixez.plugin.CustomTab
+import com.perol.pixez.plugin.DeepLinkPlugin
+import com.perol.pixez.plugin.JsEvalPlugin
+import com.perol.pixez.plugin.OpenSettinger
+import com.perol.pixez.plugin.Safer
+import com.perol.pixez.plugin.SecurePlugin
+import com.perol.pixez.plugin.Weiss
+import com.perol.pixez.plugin.exist
+import com.perol.pixez.plugin.save
 import com.waynejo.androidndkgif.GifEncoder
 import io.flutter.Log
-import io.flutter.embedding.android.FlutterFragmentActivity
+import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugins.GeneratedPluginRegistrant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.*
 
-class MainActivity : FlutterFragmentActivity() {
+class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.perol.dev/save"
     private val ENCODE_CHANNEL = "samples.flutter.dev/battery"
     private val SUPPORTER_CHANNEL = "com.perol.dev/supporter"
@@ -62,14 +67,6 @@ class MainActivity : FlutterFragmentActivity() {
     var helplessPath: String? = null
     private val SHARED_PREFERENCES_NAME = "FlutterSharedPreferences"
     lateinit var sharedPreferences: SharedPreferences
-
-    val requestPermissionLauncher =
-        registerForActivityResult(
-            ActivityResultContracts.RequestPermission()
-        ) { isGranted: Boolean ->
-            pendingPickResult?.success(isGranted)
-            pendingPickResult = null
-        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -93,6 +90,7 @@ class MainActivity : FlutterFragmentActivity() {
         CustomTab.bindChannel(this, flutterEngine)
         Safer.bindChannel(this, flutterEngine)
         JsEvalPlugin(this).bindChannel(flutterEngine)
+        SecurePlugin(this).bindChannel(flutterEngine)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             SUPPORTER_CHANNEL
@@ -159,12 +157,8 @@ class MainActivity : FlutterFragmentActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "requestPermission" -> {
-                    //TODO wait permission handler plugin
                     if (Build.VERSION.SDK_INT >= 33) {
-                        requestPermissionLauncher.launch(
-                            Manifest.permission.READ_MEDIA_IMAGES
-                        )
-                        pendingPickResult = result
+                        result.success(true)
                     }
                 }
 

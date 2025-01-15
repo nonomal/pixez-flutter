@@ -27,6 +27,7 @@
 
     <application
         android:name=".PixEz"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
         android:label="PixEz"
         android:requestLegacyExternalStorage="true">
@@ -60,10 +61,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_provider_paths" />
         </provider>
-
-        <activity
-            android:name=".IntentActivity"
-            android:theme="@style/LaunchTheme"></activity>
 
         <activity
             android:name=".MainActivity"
@@ -157,6 +154,9 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
     </application>
 
 </manifest>

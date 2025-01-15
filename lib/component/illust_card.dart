@@ -26,11 +26,14 @@ import 'package:pixez/er/lprinter.dart';
 import 'package:pixez/i18n.dart';
 import 'package:pixez/lighting/lighting_store.dart';
 import 'package:pixez/main.dart';
+import 'package:pixez/models/illust.dart';
 import 'package:pixez/page/picture/illust_lighting_page.dart';
 import 'package:pixez/page/picture/illust_store.dart';
 import 'package:pixez/page/picture/picture_list_page.dart';
 import 'package:pixez/page/picture/tag_for_illust_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// h_long.jpg
 
 class IllustCard extends StatefulWidget {
   final IllustStore store;
@@ -76,7 +79,7 @@ class _IllustCardState extends State<IllustCard> {
   Widget build(BuildContext context) {
     if (userSetting.hIsNotAllow)
       for (int i = 0; i < store.illusts!.tags.length; i++) {
-        if (store.illusts!.tags[i].name.startsWith('R-18'))
+        if (store.illusts!.tags[i].name.startsWith('R-18')) {
           return InkWell(
             onTap: () => _buildTap(context),
             onLongPress: () => _onLongPressSave(),
@@ -86,9 +89,10 @@ class _IllustCardState extends State<IllustCard> {
               clipBehavior: Clip.antiAlias,
               shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.all(Radius.circular(8.0))),
-              child: Image.asset('assets/images/h.jpg'),
+              child: Image.asset('assets/images/h_long.jpg'),
             ),
           );
+        }
       }
     return buildInkWell(context);
   }
@@ -165,8 +169,8 @@ class _IllustCardState extends State<IllustCard> {
           )
         : NullHero(
             tag: tag,
-            child: PixivImage(store.illusts!.imageUrls.medium,
-                fit: BoxFit.fitWidth),
+            child:
+                PixivImage(store.illusts!.feedPreviewUrl, fit: BoxFit.fitWidth),
           );
   }
 
@@ -190,13 +194,38 @@ class _IllustCardState extends State<IllustCard> {
                     children: [
                       Positioned.fill(child: _buildPic(tag, tooLong)),
                       Positioned(
-                          top: 5.0, right: 5.0, child: _buildVisibility()),
+                          top: 5.0,
+                          right: 5.0,
+                          child: Row(
+                            children: [
+                              if (userSetting.feedAIBadge &&
+                                  store.illusts!.illustAIType == 2)
+                                _buildAIBadge(),
+                              _buildVisibility()
+                            ],
+                          )),
                     ],
                   )),
               _buildBottom(context),
             ],
           ),
         ));
+  }
+
+  Widget _buildAIBadge() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black26,
+        borderRadius: BorderRadius.all(Radius.circular(4.0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 2.0),
+        child: Text(
+          "AI",
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+    );
   }
 
   Widget _buildAnimationWraper(BuildContext context, Widget child) {

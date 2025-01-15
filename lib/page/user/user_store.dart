@@ -38,7 +38,7 @@ abstract class _UserStoreBase with Store {
   @observable
   int value = 0;
 
-  _UserStoreBase(this.id, {this.userDetail, this.user}) {
+  _UserStoreBase(this.id, this.userDetail, this.user) {
     this.isFollow = user?.isFollowed ?? false;
   }
 
@@ -48,8 +48,9 @@ abstract class _UserStoreBase with Store {
       try {
         await client.postUnFollowUser(id);
         userDetail?.user.isFollowed = false;
+        user?.isFollowed = false;
         isFollow = false;
-      } on DioError catch (e) {
+      } on DioException catch (e) {
         if (e.response != null &&
             e.response!.statusCode == HttpStatus.badRequest) {}
       }
@@ -59,8 +60,9 @@ abstract class _UserStoreBase with Store {
       try {
         await client.postFollowUser(id, 'private');
         userDetail?.user.isFollowed = true;
+        user?.isFollowed = true;
         isFollow = true;
-      } on DioError catch (e) {
+      } on DioException catch (e) {
         if (e.response != null &&
             e.response!.statusCode == HttpStatus.badRequest) {}
       }
@@ -68,8 +70,9 @@ abstract class _UserStoreBase with Store {
       try {
         await client.postFollowUser(id, 'public');
         userDetail?.user.isFollowed = true;
+        user?.isFollowed = true;
         isFollow = true;
-      } on DioError catch (e) {
+      } on DioException catch (e) {
         if (e.response != null &&
             e.response!.statusCode == HttpStatus.badRequest) {}
       }
@@ -86,9 +89,10 @@ abstract class _UserStoreBase with Store {
       Response response = await client.getUser(id);
       UserDetail userDetail = UserDetail.fromJson(response.data);
       this.userDetail = userDetail;
+      user?.isFollowed = userDetail.user.isFollowed;
       this.user = userDetail.user;
       this.isFollow = this.userDetail!.user.isFollowed ?? false;
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.response != null && e.response!.statusCode == HttpStatus.notFound) {
         errorMessage = '404';
       } else {

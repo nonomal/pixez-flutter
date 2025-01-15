@@ -16,7 +16,6 @@
 
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart' show SelectionArea;
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:intl/intl.dart';
 import 'package:pixez/fluent/component/context_menu.dart';
@@ -121,7 +120,6 @@ class IllustDetailBody extends StatelessWidget {
           text: Text(I18n.of(context).follow),
           onPressed: () async {
             await _store.followUser();
-            Navigator.of(context).pop();
           },
         )
       ],

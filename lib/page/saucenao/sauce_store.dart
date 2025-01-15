@@ -19,21 +19,20 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
+import 'package:dio_compatibility_layer/dio_compatibility_layer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:html/parser.dart' show parse;
 import 'package:image_picker/image_picker.dart';
 import 'package:mobx/mobx.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pixez/er/leader.dart';
 import 'package:pixez/er/lprinter.dart';
 import 'package:pixez/i18n.dart';
 import 'package:pixez/main.dart';
 import 'package:image/image.dart';
 import 'package:image_picker_android/image_picker_android.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
-import 'package:pixez/page/webview/saucenao_webview_page.dart';
+import 'package:rhttp/rhttp.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -43,8 +42,7 @@ class SauceStore = SauceStoreBase with _$SauceStore;
 
 abstract class SauceStoreBase with Store {
   static String host = "saucenao.com";
-  Dio dio = Dio(BaseOptions(
-      baseUrl: "https://45.32.0.237", headers: {HttpHeaders.hostHeader: host}));
+  Dio dio = Dio(BaseOptions(baseUrl: "https://saucenao.com"));
   ObservableList<int> results = ObservableList();
   late StreamController _streamController;
   late ObservableStream observableStream;
@@ -126,23 +124,7 @@ abstract class SauceStoreBase with Store {
       final pickedFile = await picker.pickImage(source: ImageSource.gallery);
       if (pickedFile == null) return;
       Uint8List originImageBytes = await pickedFile.readAsBytes();
-      var originImage = decodeImage(originImageBytes);
-      var originWidth = originImage!.width;
-      var originHeight = originImage.height;
-      int newWidth, newHeight;
-      if (originWidth < 720 || originHeight < 720) {
-        newWidth = originWidth;
-        newHeight = originHeight;
-      } else if (originWidth > originHeight) {
-        newHeight = 720;
-        newWidth = originWidth * newHeight ~/ originHeight;
-      } else {
-        newWidth = 720;
-        newHeight = originHeight * newWidth ~/ originWidth;
-      }
-      var newImage =
-          copyResize(originImage, width: newWidth, height: newHeight);
-      var newImageBytes = encodeJpg(newImage, quality: 75);
+      var newImageBytes = compressImage(originImageBytes);
       LPrinter.d(
           "Uncompressed image size: ${originImageBytes.length}, compressed image size: ${newImageBytes.length}");
       path =
@@ -155,16 +137,24 @@ abstract class SauceStoreBase with Store {
     ]);
     try {
       BotToast.showText(text: "uploading");
-      if (userSetting.disableBypassSni) {
-        dio.options.baseUrl = "https://$host";
-      } else {
-        dio.httpClientAdapter = IOHttpClientAdapter()
-          ..onHttpClientCreate = (client) {
-            client.badCertificateCallback =
-                (X509Certificate cert, String host, int port) => true;
-            return client;
-          };
-      }
+
+      // if (!userSetting.disableBypassSni) {
+      //   final compatibleClient = await RhttpCompatibleClient.create(
+      //     settings: userSetting.disableBypassSni
+      //         ? null
+      //         : ClientSettings(
+      //             tlsSettings: TlsSettings(
+      //               verifyCertificates: false,
+      //               sni: false,
+      //             ),
+      //             dnsSettings: DnsSettings.dynamic(
+      //               resolver: (host) async {
+      //                 return ['104.26.14.28'];
+      //               },
+      //             )),
+      //   );
+      //   dio.httpClientAdapter = ConversionLayerAdapter(compatibleClient);
+      // }
       Response response = await dio.post('/search.php', data: formData);
       BotToast.showText(text: "parsing");
       var document = parse(response.data);
@@ -187,5 +177,24 @@ abstract class SauceStoreBase with Store {
     } catch (e) {
       BotToast.showText(text: "error${e}");
     }
+  }
+
+  Uint8List compressImage(Uint8List originImageBytes) {
+    var originImage = decodeImage(originImageBytes);
+    var originWidth = originImage!.width;
+    var originHeight = originImage.height;
+    int newWidth, newHeight;
+    if (originWidth < 720 || originHeight < 720) {
+      newWidth = originWidth;
+      newHeight = originHeight;
+    } else if (originWidth > originHeight) {
+      newHeight = 720;
+      newWidth = originWidth * newHeight ~/ originHeight;
+    } else {
+      newWidth = 720;
+      newHeight = originHeight * newWidth ~/ originWidth;
+    }
+    var newImage = copyResize(originImage, width: newWidth, height: newHeight);
+    return encodeJpg(newImage, quality: 75);
   }
 }

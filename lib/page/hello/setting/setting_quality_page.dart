@@ -108,13 +108,17 @@ class _SettingQualityPageState extends State<SettingQualityPage>
             _buildLanguageSelect(),
             Divider(),
             ListTile(
-              leading: const Icon(Icons.zoom_out_map),
-              title: Text(I18n.of(context).large_preview_zoom_quality),
+              leading: const Icon(Icons.feed),
+              title: Text(I18n.of(context).feed_preview_quality),
               trailing: SettingSelectMenu(
-                index: userSetting.zoomQuality,
-                items: [I18n.of(context).large, I18n.of(context).source],
+                index: userSetting.feedPreviewQuality,
+                items: [
+                  I18n.of(context).medium,
+                  I18n.of(context).large,
+                  I18n.of(context).source
+                ],
                 onChange: (index) {
-                  userSetting.change(index);
+                  userSetting.changeFeedPreviewQuality(index);
                 },
               ),
             ),
@@ -141,6 +145,17 @@ class _SettingQualityPageState extends State<SettingQualityPage>
                 ],
                 onChange: (index) {
                   userSetting.setMangaQuality(index);
+                },
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.zoom_out_map),
+              title: Text(I18n.of(context).large_preview_zoom_quality),
+              trailing: SettingSelectMenu(
+                index: userSetting.zoomQuality,
+                items: [I18n.of(context).large, I18n.of(context).source],
+                onChange: (index) {
+                  userSetting.change(index);
                 },
               ),
             ),
@@ -241,19 +256,19 @@ class _SettingQualityPageState extends State<SettingQualityPage>
               leading: const Icon(Icons.task),
               title: Text(I18n.of(context).max_download_task_running_count),
               trailing: SettingSelectMenu(
-                index: userSetting.zoomQuality,
+                index: userSetting.maxRunningTask - 1,
                 items: [
-                  ...List<String>.generate(9, (i) => "${i + 2}").toList()
+                  ...List<String>.generate(10, (i) => "${i + 1}").toList()
                 ],
                 onChange: (index) {
-                  userSetting.setMaxRunningTask(index);
+                  userSetting.setMaxRunningTask(index + 1);
                 },
               ),
             ),
             if (_widgetTypeIndex != -1)
               ListTile(
                 leading: const Icon(Icons.widgets),
-                title: Text("App widget type"),
+                title: Text(I18n.of(context).appwidget_recommend_type),
                 trailing: SettingSelectMenu(
                   index: userSetting.zoomQuality,
                   items: [
@@ -303,19 +318,34 @@ class _SettingQualityPageState extends State<SettingQualityPage>
                 onChanged: (value) async {
                   userSetting.setSwipeChangeArtwork(value);
                 }),
-            SwitchListTile(
-                value: userSetting.useSaunceNaoWebview,
-                title: Text("Use Saucenao webview"),
-                onChanged: (value) async {
-                  userSetting.setUseSaunceNaoWebview(value);
-                }),
-            if (Platform.isIOS)
+            if (Platform.isAndroid || Platform.isIOS)
               SwitchListTile(
                   value: userSetting.nsfwMask,
-                  title: Text("最近任务遮罩"),
+                  title: Text(Platform.isIOS
+                      ? I18n.of(context).recent_screen_mask
+                      : I18n.of(context).secure_window),
                   onChanged: (value) async {
                     userSetting.changeNsfwMask(value);
                   }),
+            if (!Platform.isIOS)
+              SwitchListTile(
+                  value: userSetting.useSaunceNaoWebview,
+                  title: Text(I18n.of(context).open_saucenao_using_webview),
+                  onChanged: (value) async {
+                    userSetting.setUseSaunceNaoWebview(value);
+                  }),
+            SwitchListTile(
+                value: userSetting.illustDetailSaveSkipLongPress,
+                title: Text(I18n.of(context).illust_detail_save_skip_confirm),
+                onChanged: (value) async {
+                  userSetting.setIllustDetailSaveSkipLongPress(value);
+                }),
+            SwitchListTile(
+                value: userSetting.feedAIBadge,
+                title: Text(I18n.of(context).show_feed_ai_badge),
+                onChanged: (value) async {
+                  userSetting.setFeedAIBadge(value);
+                }),
             Divider(),
             SwitchListTile(
                 value: userSetting.followAfterStar,

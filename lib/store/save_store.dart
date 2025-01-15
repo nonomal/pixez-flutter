@@ -139,9 +139,7 @@ abstract class _SaveStoreBase with Store {
                                     stream.entity as QueueRetryEntity;
                                 final id = entity.taskPersist.id;
                                 if (id != null) {
-                                  final result = await fetcher
-                                      .taskPersistProvider
-                                      .remove(id);
+                                  await fetcher.taskPersistProvider.remove(id);
                                   _joinQueue(entity.url, entity.illusts,
                                       entity.fileName);
                                 }
@@ -236,7 +234,7 @@ abstract class _SaveStoreBase with Store {
       } catch (e) {}
     }
     streamController.add(SaveStream(SaveState.JOIN, illusts, index: index));
-    File? file = (await pixivCacheManager.getFileFromCache(url))?.file;
+    File? file = (await pixivCacheManager!.getFileFromCache(url))?.file;
     if (file == null) {
       _joinQueue(url, illusts, fileName);
     } else {

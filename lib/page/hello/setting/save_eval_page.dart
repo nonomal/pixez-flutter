@@ -64,7 +64,7 @@ class _SaveEvalPageState extends State<SaveEvalPage> {
     _textEditingController = TextEditingController(
         text: widget.eval ?? userSetting.nameEval ?? default_func_str);
     super.initState();
-    _exampleJson = jsonEncode(_illusts.toJson());
+    _exampleJson = JsonEncoder.withIndent('  ').convert(_illusts.toJson());
   }
 
   final default_func_str = '''
@@ -120,7 +120,7 @@ function eval(illust, index, mime) {
             ),
             ListTile(
               title: Text("Example output file name:"),
-              subtitle: Text(_fileName ?? "undifined"),
+              subtitle: Text(_fileName ?? "undefined"),
             ),
             Container(
               height: 200,

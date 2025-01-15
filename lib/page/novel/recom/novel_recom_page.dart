@@ -32,7 +32,8 @@ class NovelRecomPage extends StatefulWidget {
   _NovelRecomPageState createState() => _NovelRecomPageState();
 }
 
-class _NovelRecomPageState extends State<NovelRecomPage> {
+class _NovelRecomPageState extends State<NovelRecomPage>
+    with AutomaticKeepAliveClientMixin {
   late NovelLightingStore _store;
   late EasyRefreshController _easyRefreshController;
 
@@ -74,6 +75,7 @@ class _NovelRecomPageState extends State<NovelRecomPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return EasyRefresh.builder(
       header: PixezDefault.header(context),
       onRefresh: () => _store.fetch(),
@@ -152,16 +154,45 @@ class _NovelRecomPageState extends State<NovelRecomPage> {
                           Padding(
                             padding:
                                 const EdgeInsets.symmetric(horizontal: 8.0),
-                            child: Text(
-                              novel.user.name,
-                              maxLines: 1,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall!
-                                  .copyWith(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .secondary),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  novel.user.name,
+                                  maxLines: 1,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall!
+                                      .copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .secondary),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.only(left: 8),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.article,
+                                        size: 12,
+                                        color: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall!
+                                            .color,
+                                      ),
+                                      SizedBox(
+                                        width: 2,
+                                      ),
+                                      Text(
+                                        '${novel.textLength}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .labelSmall,
+                                      )
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           Padding(
@@ -207,4 +238,7 @@ class _NovelRecomPageState extends State<NovelRecomPage> {
       ),
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }
