@@ -19,10 +19,10 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pixez/component/pixiv_image.dart';
+import 'package:pixez/er/hoster.dart';
 import 'package:pixez/er/lprinter.dart';
 import 'package:pixez/er/toaster.dart';
 import 'package:pixez/i18n.dart';
@@ -31,6 +31,8 @@ import 'package:pixez/models/illust.dart';
 import 'package:pixez/models/task_persist.dart';
 import 'package:pixez/store/save_store.dart';
 import 'package:quiver/collection.dart';
+import 'package:rhttp/rhttp.dart' as r;
+import 'package:rhttp/rhttp.dart';
 
 class PixivClientAdapter implements HttpClientAdapter {
   final HttpClientAdapter _adapter = HttpClientAdapter();
@@ -101,7 +103,7 @@ class Fetcher {
 
   Fetcher() {}
 
-  start() async {
+  start(String pictureSource) async {
     if (receivePort.isBroadcast) return;
     await taskPersistProvider.open();
     await taskPersistProvider.getAllAccount();
@@ -156,7 +158,8 @@ class Fetcher {
         }
       } catch (e) {}
     });
-    isolate = await Isolate.spawn(entryPoint, receivePort.sendPort,
+    isolate = await Isolate.spawn(
+        entryPoint, SendMessage(receivePort.sendPort, pictureSource),
         debugName: 'childIsolate');
   }
 
@@ -240,27 +243,44 @@ class Fetcher {
   }
 }
 
+class SendMessage {
+  final SendPort sendPort;
+  final String pictureSource;
+
+  SendMessage(this.sendPort, this.pictureSource);
+}
+
 class Seed {}
 
-Dio isolateDio = Dio(BaseOptions(headers: {
-  "referer": "https://app-api.pixiv.net/",
-  "User-Agent": "PixivIOSApp/5.8.0",
-  "Host": "i.pximg.net"
-}));
-// 新Isolate入口函数
-entryPoint(SendPort sendPort) {
-  LPrinter.d("entryPoint =======");
-  String inHost = splashStore.host;
-  String inSource = userSetting.pictureSource!;
-  bool inBypass = userSetting.disableBypassSni;
-  if (!userSetting.disableBypassSni) {
-    isolateDio.httpClientAdapter = IOHttpClientAdapter()
-      ..onHttpClientCreate = (client) {
-        client.badCertificateCallback =
-            (X509Certificate cert, String host, int port) => true;
-        return client;
-      };
-  }
+r.RhttpClient? isolateDio;
+
+entryPoint(SendMessage message) async {
+  String pictureSource = message.pictureSource;
+  SendPort sendPort = message.sendPort;
+  LPrinter.d("entryPoint ====== $pictureSource");
+  String inSource = pictureSource;
+  await Rhttp.init();
+  await Hoster.initMap();
+  Hoster.dnsQueryFetcher();
+  isolateDio = await r.RhttpClient.create(
+      settings: userSetting.disableBypassSni || pictureSource != ImageHost
+          ? null
+          : r.ClientSettings(
+              tlsSettings: r.TlsSettings(
+                verifyCertificates: false,
+                sni: false,
+              ),
+              dnsSettings: r.DnsSettings.dynamic(resolver: (host) async {
+                if (host == 'i.pximg.net') {
+                  return [Hoster.iPximgNet()];
+                }
+                if (host == 's.pximg.net') {
+                  return [Hoster.sPximgNet()];
+                }
+                return await InternetAddress.lookup(host)
+                    .then((value) => value.map((e) => e.address).toList());
+              }),
+            ));
   ReceivePort receivePort = ReceivePort();
   sendPort.send(
       IsoContactBean(state: IsoTaskState.INIT, data: receivePort.sendPort));
@@ -273,37 +293,40 @@ entryPoint(SendPort sendPort) {
           break;
         case IsoTaskState.APPEND:
           try {
-            inHost = taskBean.host!;
             inSource = taskBean.source!;
-            inBypass = taskBean.byPass!;
-            LPrinter.d(
-                "append ======= host:${inHost} source:${inSource} bypass:${inBypass}");
             var savePath = taskBean.savePath! +
                 Platform.pathSeparator +
                 taskBean.fileName!;
-            String trueUrl = taskBean.byPass == true
-                ? taskBean.url!
-                : (Uri.parse(taskBean.url!).replace(
-                        host: inSource == ImageHost || inSource == ImageSHost
-                            ? inHost
-                            : inSource))
-                    .toString();
-            LPrinter.d(
-                "append ======= host:${inHost} source:${inSource} bypass:${inBypass} ${trueUrl}");
-            isolateDio.options.headers['Host'] = taskBean.source == ImageHost
-                ? Uri.parse(taskBean.url!).host
-                : taskBean.source;
-            isolateDio.download(trueUrl, savePath,
-                onReceiveProgress: (min, total) {
+            String trueUrl = taskBean.url!;
+            String originHost = Uri.parse(taskBean.url!).host;
+            if (taskBean.byPass == true) {
+            } else {
+              if (originHost == ImageHost) {
+                trueUrl = 'https://${inSource}${Uri.parse(taskBean.url!).path}';
+              } else {
+                // ?
+                trueUrl = taskBean.url!;
+              }
+            }
+            isolateDio!.getBytes(trueUrl,
+                headers: r.HttpHeaders.rawMap({
+                  "referer": "https://app-api.pixiv.net/",
+                  "User-Agent": "PixivIOSApp/5.8.0",
+                }), onReceiveProgress: (min, total) {
               sendPort.send(IsoContactBean(
                   state: IsoTaskState.PROGRESS,
                   data: IsoProgressBean(
                       min: min, total: total, url: taskBean.url!)));
             }).then((value) {
+              File file = File(savePath);
+              // create dir
+              if (!file.parent.existsSync()) {
+                file.parent.createSync(recursive: true);
+              }
+              file.writeAsBytesSync(value.body);
               sendPort.send(
                   IsoContactBean(state: IsoTaskState.COMPLETE, data: taskBean));
             }).catchError((e) {
-              LPrinter.d("fetcher=======");
               LPrinter.d(e);
               try {
                 splashStore.maybeFetch();

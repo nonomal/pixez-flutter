@@ -23,13 +23,12 @@ import 'package:pixez/i18n.dart';
 import 'package:pixez/models/user_detail.dart';
 import 'package:pixez/page/follow/follow_list.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 class UserDetailPage extends StatefulWidget {
   final UserDetail? userDetail;
-  bool isNewNested;
-  bool? isNovel;
+  final bool isNewNested;
+  final bool? isNovel;
 
   UserDetailPage(
       {Key? key,
@@ -44,9 +43,11 @@ class UserDetailPage extends StatefulWidget {
 
 class _UserDetailPageState extends State<UserDetailPage> {
   bool _isNovel = false;
+  bool _isNewNested = false;
 
   @override
   void initState() {
+    _isNewNested = widget.isNewNested;
     _isNovel = widget.isNovel ?? false;
     super.initState();
   }
@@ -56,7 +57,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
     var detail = widget.userDetail;
     var profile = widget.userDetail?.profile;
     var public = widget.userDetail?.profile_publicity;
-    if (widget.isNewNested)
+    if (_isNewNested)
       return SafeArea(
         top: false,
         bottom: false,
@@ -78,7 +79,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
     return CustomScrollView(
       key: PageStorageKey<String>("user_detail"),
       slivers: [
-        if (widget.isNewNested)
+        if (_isNewNested)
           SliverOverlapInjector(
             handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
           ),
@@ -167,7 +168,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                           await launchUrlString(url,
                               mode: LaunchMode.externalApplication);
                         } else {
-                          await launch(url);
+                          await launchUrlString(url);
                         }
                       } catch (e) {
                         Share.share(url);
@@ -190,7 +191,7 @@ class _UserDetailPageState extends State<UserDetailPage> {
                     if (public?.pawoo == null || !public!.pawoo) return;
                     var url = detail?.profile.pawoo_url;
                     try {
-                      await launch(url!);
+                      await launchUrlString(url!);
                     } catch (e) {}
                   }),
                 ]),

@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:pixez/constants.dart';
 import 'package:pixez/er/leader.dart';
+import 'package:pixez/er/prefer.dart';
 import 'package:pixez/i18n.dart';
 import 'package:pixez/main.dart';
 import 'package:pixez/models/glance_illust_persist.dart';
@@ -29,7 +30,6 @@ import 'package:pixez/page/hello/setting/copy_text_page.dart';
 import 'package:pixez/page/hello/setting/setting_cross_adapter_page.dart';
 import 'package:pixez/page/network/network_page.dart';
 import 'package:pixez/page/platform/platform_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingQualityPage extends StatefulWidget {
@@ -40,7 +40,6 @@ class SettingQualityPage extends StatefulWidget {
 class _SettingQualityPageState extends State<SettingQualityPage>
     with TickerProviderStateMixin {
   final _typeList = ["follow_illust", "recom", "rank"];
-  SharedPreferences? _pref;
   int _widgetTypeIndex = -1;
   GlanceIllustPersistProvider glanceIllustPersistProvider =
       GlanceIllustPersistProvider();
@@ -52,8 +51,7 @@ class _SettingQualityPageState extends State<SettingQualityPage>
   }
 
   _initData() async {
-    _pref = await SharedPreferences.getInstance();
-    final type = await _pref?.getString("widget_illust_type") ?? "recom";
+    final type = await Prefer.getString("widget_illust_type") ?? "recom";
     int index = _typeList.indexOf(type);
     if (index != -1) {
       setState(() {
@@ -108,13 +106,17 @@ class _SettingQualityPageState extends State<SettingQualityPage>
             _buildLanguageSelect(),
             Divider(),
             ListTile(
-              leading: const Icon(Icons.zoom_out_map),
-              title: Text(I18n.of(context).large_preview_zoom_quality),
+              leading: const Icon(Icons.feed),
+              title: Text(I18n.of(context).feed_preview_quality),
               trailing: SettingSelectMenu(
-                index: userSetting.zoomQuality,
-                items: [I18n.of(context).large, I18n.of(context).source],
+                index: userSetting.feedPreviewQuality,
+                items: [
+                  I18n.of(context).medium,
+                  I18n.of(context).large,
+                  I18n.of(context).source
+                ],
                 onChange: (index) {
-                  userSetting.change(index);
+                  userSetting.changeFeedPreviewQuality(index);
                 },
               ),
             ),
@@ -123,7 +125,11 @@ class _SettingQualityPageState extends State<SettingQualityPage>
               title: Text(I18n.of(context).illustration_detail_page_quality),
               trailing: SettingSelectMenu(
                 index: userSetting.pictureQuality,
-                items: [I18n.of(context).medium, I18n.of(context).large],
+                items: [
+                  I18n.of(context).medium,
+                  I18n.of(context).large,
+                  I18n.of(context).source
+                ],
                 onChange: (index) {
                   userSetting.setPictureQuality(index);
                 },
@@ -141,6 +147,17 @@ class _SettingQualityPageState extends State<SettingQualityPage>
                 ],
                 onChange: (index) {
                   userSetting.setMangaQuality(index);
+                },
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.zoom_out_map),
+              title: Text(I18n.of(context).large_preview_zoom_quality),
+              trailing: SettingSelectMenu(
+                index: userSetting.zoomQuality,
+                items: [I18n.of(context).large, I18n.of(context).source],
+                onChange: (index) {
+                  userSetting.change(index);
                 },
               ),
             ),
@@ -241,19 +258,19 @@ class _SettingQualityPageState extends State<SettingQualityPage>
               leading: const Icon(Icons.task),
               title: Text(I18n.of(context).max_download_task_running_count),
               trailing: SettingSelectMenu(
-                index: userSetting.zoomQuality,
+                index: userSetting.maxRunningTask - 1,
                 items: [
-                  ...List<String>.generate(9, (i) => "${i + 2}").toList()
+                  ...List<String>.generate(10, (i) => "${i + 1}").toList()
                 ],
                 onChange: (index) {
-                  userSetting.setMaxRunningTask(index);
+                  userSetting.setMaxRunningTask(index + 1);
                 },
               ),
             ),
             if (_widgetTypeIndex != -1)
               ListTile(
                 leading: const Icon(Icons.widgets),
-                title: Text("App widget type"),
+                title: Text(I18n.of(context).appwidget_recommend_type),
                 trailing: SettingSelectMenu(
                   index: userSetting.zoomQuality,
                   items: [
@@ -264,7 +281,7 @@ class _SettingQualityPageState extends State<SettingQualityPage>
                   onChange: (index) async {
                     try {
                       final type = _typeList[index];
-                      await _pref?.setString("widget_illust_type", type);
+                      await Prefer.setString("widget_illust_type", type);
                       await glanceIllustPersistProvider.open();
                       await glanceIllustPersistProvider.deleteAll();
                     } catch (e) {}
@@ -303,19 +320,34 @@ class _SettingQualityPageState extends State<SettingQualityPage>
                 onChanged: (value) async {
                   userSetting.setSwipeChangeArtwork(value);
                 }),
-            SwitchListTile(
-                value: userSetting.useSaunceNaoWebview,
-                title: Text("Use Saucenao webview"),
-                onChanged: (value) async {
-                  userSetting.setUseSaunceNaoWebview(value);
-                }),
-            if (Platform.isIOS)
+            if (Platform.isAndroid || Platform.isIOS)
               SwitchListTile(
                   value: userSetting.nsfwMask,
-                  title: Text("最近任务遮罩"),
+                  title: Text(Platform.isIOS
+                      ? I18n.of(context).recent_screen_mask
+                      : I18n.of(context).secure_window),
                   onChanged: (value) async {
                     userSetting.changeNsfwMask(value);
                   }),
+            if (!Platform.isIOS)
+              SwitchListTile(
+                  value: userSetting.useSaunceNaoWebview,
+                  title: Text(I18n.of(context).open_saucenao_using_webview),
+                  onChanged: (value) async {
+                    userSetting.setUseSaunceNaoWebview(value);
+                  }),
+            SwitchListTile(
+                value: userSetting.illustDetailSaveSkipLongPress,
+                title: Text(I18n.of(context).illust_detail_save_skip_confirm),
+                onChanged: (value) async {
+                  userSetting.setIllustDetailSaveSkipLongPress(value);
+                }),
+            SwitchListTile(
+                value: userSetting.feedAIBadge,
+                title: Text(I18n.of(context).show_feed_ai_badge),
+                onChanged: (value) async {
+                  userSetting.setFeedAIBadge(value);
+                }),
             Divider(),
             SwitchListTile(
                 value: userSetting.followAfterStar,

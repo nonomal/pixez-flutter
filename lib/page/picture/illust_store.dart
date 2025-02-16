@@ -18,10 +18,11 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:mobx/mobx.dart';
-import 'package:pixez/main.dart';
 import 'package:pixez/models/error_message.dart';
 import 'package:pixez/models/illust.dart';
+import 'package:pixez/models/illust_series_detail.dart';
 import 'package:pixez/network/api_client.dart';
+import 'package:pixez/page/history/history_store.dart';
 
 part 'illust_store.g.dart';
 
@@ -36,13 +37,16 @@ abstract class _IllustStoreBase with Store {
   bool isBookmark = false;
   @observable
   String? errorMessage;
-
   @observable
   int state = 0;
+  @observable
+  bool captionFetchError = false;
+  @observable
+  bool captionFetching = false;
+  @observable
+  IllustSeriesDetailResponse? illustSeriesDetailResponse;
 
-  void dispose() {
-
-  }
+  void dispose() {}
 
   _IllustStoreBase(this.id, this.illusts) {
     isBookmark = illusts?.isBookmarked ?? false;
@@ -52,33 +56,59 @@ abstract class _IllustStoreBase with Store {
   @action
   fetch() async {
     errorMessage = null;
-    if (illusts == null) {
+    if (illusts == null ||
+        illusts?.caption == null ||
+        illusts?.caption.isEmpty == true) {
+      final captionEmtpyCase = illusts != null && illusts!.caption.isEmpty;
+      if (captionEmtpyCase) {
+        captionFetching = true;
+      }
       try {
         Response response = await client.getIllustDetail(id);
         final result = Illusts.fromJson(response.data['illust']);
         illusts = result;
         isBookmark = illusts!.isBookmarked;
         state = illusts?.isBookmarked ?? isBookmark ? 2 : 0;
-      } on DioError catch (e) {
-        if (e.response != null) {
-          if (e.response!.statusCode == HttpStatus.notFound) {
-            errorMessage = '404 Not Found';
-            return;
-          }
-          try {
-            errorMessage =
-                ErrorMessage.fromJson(e.response!.data).error.message;
-          } catch (e) {
+        captionFetching = false;
+      } on DioException catch (e) {
+        captionFetching = false;
+        if (captionEmtpyCase) {
+          captionFetchError = true;
+        } else {
+          if (e.response != null) {
+            if (e.response!.statusCode == HttpStatus.notFound) {
+              errorMessage = '404 Not Found';
+              return;
+            }
+            try {
+              errorMessage =
+                  ErrorMessage.fromJson(e.response!.data).error.message;
+            } catch (e) {
+              errorMessage = e.toString();
+            }
+          } else {
             errorMessage = e.toString();
           }
-        } else {
-          errorMessage = e.toString();
         }
       }
     }
-    if (illusts != null) historyStore.insert(illusts!);
+    if (illusts != null) {
+      try {
+        History.insertIllust(illusts!);
+      } catch (e) {}
+    }
+    if (illusts?.series != null && illustSeriesDetailResponse == null) {
+      try {
+        Response response = await client.illustSeriesIllust(id);
+        final result = IllustSeriesDetailResponse.fromJson(response.data);
+        illustSeriesDetailResponse = result;
+      } catch (e) {
+        print(e);
+      }
+    }
   }
 
+  @action
   Future<bool> followAfterStar() async {
     try {
       if (!illusts!.user.isFollowed!) {
@@ -97,8 +127,7 @@ abstract class _IllustStoreBase with Store {
     state = 1;
     if (force || !illusts!.isBookmarked) {
       try {
-        await ApiClient(isBookmark: true)
-            .postLikeIllust(illusts!.id, restrict, tags);
+        await apiClient.postLikeIllust(illusts!.id, restrict, tags);
         illusts!.isBookmarked = true;
         isBookmark = true;
         state = 2;
@@ -106,7 +135,7 @@ abstract class _IllustStoreBase with Store {
       } catch (e) {}
     } else {
       try {
-        await ApiClient(isBookmark: true).postUnLikeIllust(illusts!.id);
+        await apiClient.postUnLikeIllust(illusts!.id);
         illusts!.isBookmarked = false;
         isBookmark = false;
         state = 0;

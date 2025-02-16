@@ -19,7 +19,6 @@ import 'dart:io';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -30,13 +29,14 @@ import 'package:pixez/component/painter_avatar.dart';
 import 'package:pixez/component/pixiv_image.dart';
 import 'package:pixez/document_plugin.dart';
 import 'package:pixez/er/hoster.dart';
-import 'package:pixez/exts.dart';
 import 'package:pixez/i18n.dart';
 import 'package:pixez/lighting/lighting_store.dart';
 import 'package:pixez/main.dart';
 import 'package:pixez/models/illust.dart';
 import 'package:pixez/network/api_client.dart';
 import 'package:pixez/page/follow/follow_list.dart';
+import 'package:pixez/page/novel/user/novel_users_page.dart';
+import 'package:pixez/page/picture/user_follow_button.dart';
 import 'package:pixez/page/report/report_items_page.dart';
 import 'package:pixez/page/shield/shield_page.dart';
 import 'package:pixez/page/user/bookmark/bookmark_page.dart';
@@ -81,7 +81,7 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
     _bookmarkStore = LightingStore(ApiForceSource(
         futureGet: (e) =>
             apiClient.getBookmarksIllust(widget.id, restrict, null)));
-    userStore = widget.userStore ?? UserStore(widget.id);
+    userStore = widget.userStore ?? UserStore(widget.id, null, null);
     _tabController = TabController(length: 3, vsync: this);
     _scrollController = ScrollController();
     _scrollController.addListener(() {
@@ -151,7 +151,7 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
         }
       }
 
-      if (userStore.errorMessage != null && userStore.user != null) {
+      if (userStore.errorMessage != null && userStore.user == null) {
         if (userStore.errorMessage!.contains("404"))
           return Scaffold(
             appBar: AppBar(),
@@ -246,7 +246,12 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
           pinned: true,
           elevation: 0.0,
           forceElevated: innerBoxIsScrolled ?? false,
-          expandedHeight: 280,
+          expandedHeight:
+              userStore.userDetail?.profile.background_image_url != null
+                  ? MediaQuery.of(context).size.width / 2 +
+                      205 -
+                      MediaQuery.of(context).padding.top
+                  : 300,
           leading: CommonBackArea(),
           actions: <Widget>[
             Builder(builder: (context) {
@@ -417,7 +422,9 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
   Widget _buildBackground(BuildContext context) {
     return Container(
         width: MediaQuery.of(context).size.width,
-        height: MediaQuery.of(context).padding.top + 160,
+        height: userStore.userDetail?.profile.background_image_url != null
+            ? MediaQuery.of(context).size.width / 2
+            : MediaQuery.of(context).padding.top + 160,
         child: userStore.userDetail != null
             ? userStore.userDetail!.profile.background_image_url != null
                 ? InkWell(
@@ -427,6 +434,18 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
                           builder: (context) {
                             return AlertDialog(
                               title: Text(I18n.of(context).save),
+                              content: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: CachedNetworkImage(
+                                  imageUrl: userStore.userDetail!.profile
+                                      .background_image_url!,
+                                  fit: BoxFit.cover,
+                                  cacheManager: pixivCacheManager,
+                                  httpHeaders: Hoster.header(
+                                      url: userStore.userDetail!.profile
+                                          .background_image_url),
+                                ),
+                              ),
                               actions: [
                                 TextButton(
                                     onPressed: () async {
@@ -513,15 +532,23 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
                       widget.id.toString(), userStore.userDetail!.user.name));
               break;
             }
+          case 4:
+            Navigator.of(context)
+                .push(MaterialPageRoute(builder: (BuildContext context) {
+              return NovelUsersPage(
+                id: widget.id,
+              );
+            }));
           default:
         }
       },
       itemBuilder: (context) {
         return [
-          PopupMenuItem<int>(
-            value: 0,
-            child: Text(I18n.of(context).quietly_follow),
-          ),
+          if (!userStore.isFollow)
+            PopupMenuItem<int>(
+              value: 0,
+              child: Text(I18n.of(context).quietly_follow),
+            ),
           PopupMenuItem<int>(
             value: 1,
             child: Text(I18n.of(context).block_user),
@@ -533,6 +560,10 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
           PopupMenuItem<int>(
             value: 3,
             child: Text(I18n.of(context).report),
+          ),
+          PopupMenuItem<int>(
+            value: 4,
+            child: Text(I18n.of(context).novel_page),
           ),
         ];
       },
@@ -609,7 +640,7 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
       height: 60,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 16.0),
-        child: SelectionContainer.disabled(
+        child: SelectionArea(
           child: SingleChildScrollView(
             child: Text(
               userStore.userDetail == null
@@ -669,6 +700,18 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
                         builder: (context) {
                           return AlertDialog(
                             title: Text(I18n.of(context).save_painter_avatar),
+                            content: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: CachedNetworkImage(
+                                imageUrl:
+                                    userStore.user!.profileImageUrls.medium,
+                                fit: BoxFit.cover,
+                                cacheManager: pixivCacheManager,
+                                httpHeaders: Hoster.header(
+                                    url: userStore
+                                        .user!.profileImageUrls.medium),
+                              ),
+                            ),
                             actions: [
                               TextButton(
                                   onPressed: () async {
@@ -699,60 +742,12 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
                     )
                   : Padding(
                       padding: const EdgeInsets.only(right: 16.0, bottom: 4.0),
-                      child: userStore.isFollow
-                          ? MaterialButton(
-                              textColor: Colors.white,
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 20.0, vertical: 0),
-                              color: Theme.of(context).colorScheme.secondary,
-                              onPressed: () {
-                                if (accountStore.now != null) {
-                                  if (int.parse(accountStore.now!.userId) !=
-                                      widget.id) {
-                                    userStore.follow(needPrivate: false);
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                            content: Text(
-                                                'Who is the most beautiful person in the world?')));
-                                  }
-                                }
-                              },
-                              child: Text(I18n.of(context).followed),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(20))),
-                            )
-                          : OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(18.0),
-                                  ),
-                                  side: BorderSide(),
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 20.0, vertical: 0)),
-                              onPressed: () {
-                                if (accountStore.now != null) {
-                                  if (int.parse(accountStore.now!.userId) !=
-                                      widget.id) {
-                                    userStore.follow(needPrivate: false);
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                            content: Text(
-                                                'Who is the most beautiful person in the world?')));
-                                  }
-                                }
-                              },
-                              child: Text(
-                                I18n.of(context).follow,
-                                style: TextStyle(
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .bodyLarge!
-                                        .color),
-                              ),
-                            ),
+                      child: UserFollowButton(
+                        followed: userStore.isFollow,
+                        onPressed: () async {
+                          await userStore.follow(needPrivate: false);
+                        },
+                      ),
                     ),
             )
           ],
@@ -763,7 +758,7 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
 
   _saveUserBg(String url) async {
     try {
-      final result = await pixivCacheManager.downloadFile(url, authHeaders: {
+      final result = await pixivCacheManager!.downloadFile(url, authHeaders: {
         'referer': 'https://app-api.pixiv.net/',
       });
       final bytes = await result.file.readAsBytes();
@@ -792,14 +787,9 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
       String tempFile = (await getTemporaryDirectory()).path + "/$fileName";
       final dio = Dio(BaseOptions(headers: Hoster.header(url: url)));
       if (!userSetting.disableBypassSni) {
-        dio.httpClientAdapter = IOHttpClientAdapter()
-          ..onHttpClientCreate = (client) {
-            client.badCertificateCallback =
-                (X509Certificate cert, String host, int port) => true;
-            return client;
-          };
+        dio.httpClientAdapter = await ApiClient.createCompatibleClient();
       }
-      await dio.download(url.toTrueUrl(), tempFile, deleteOnError: true);
+      await dio.download(url, tempFile, deleteOnError: true);
       File file = File(tempFile);
       if (file.existsSync()) {
         await saveStore.saveToGallery(
@@ -816,7 +806,8 @@ class _UsersPageState extends State<UsersPage> with TickerProviderStateMixin {
               metaPages: [],
               type: '',
               width: 0,
-              series: Object(),
+              series: null,
+              totalComments: 0,
               totalBookmarks: 0,
               visible: false,
               isMuted: false,

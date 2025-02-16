@@ -28,7 +28,7 @@ import 'package:pixez/page/hello/setting/setting_quality_page.dart';
 import 'package:pixez/page/login/token_page.dart';
 import 'package:pixez/page/webview/webview_page.dart';
 import 'package:pixez/weiss_plugin.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -104,12 +104,11 @@ class _LoginPageState extends State<LoginPage> {
                   padding: EdgeInsets.only(bottom: 20),
                   child: Container(
                     padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: AutofillGroup(
+                    child: Container(
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
-                          Padding(
-                            padding: EdgeInsets.all(10),
-                          ),
+                          SizedBox(height: 10),
                           FilledButton(
                               child: Text(
                                 I18n.of(context).login,
@@ -121,6 +120,7 @@ class _LoginPageState extends State<LoginPage> {
                                   _launch(url);
                                 } catch (e) {}
                               }),
+                          SizedBox(height: 4),
                           FilledButton(
                             onPressed: () async {
                               try {
@@ -132,12 +132,14 @@ class _LoginPageState extends State<LoginPage> {
                             },
                             child: Text(I18n.of(context).dont_have_account),
                           ),
+                          SizedBox(height: 4),
                           OutlinedButton(
                             onPressed: () async {
                               Leader.push(context, TokenPage());
                             },
                             child: Text("Token"),
                           ),
+                          SizedBox(height: 4),
                           TextButton(
                             child: Text(
                               I18n.of(context).terms,
@@ -146,7 +148,7 @@ class _LoginPageState extends State<LoginPage> {
                               final url =
                                   'https://www.pixiv.net/terms/?page=term';
                               try {
-                                await launch(url);
+                                await launchUrlString(url);
                               } catch (e) {}
                             },
                           ),

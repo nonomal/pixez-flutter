@@ -20,11 +20,16 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:mobx/mobx.dart';
+import 'package:pixez/component/picker/utils.dart';
 import 'package:pixez/component/pixiv_image.dart';
+import 'package:pixez/er/hoster.dart';
+import 'package:pixez/er/prefer.dart';
 import 'package:pixez/main.dart';
 import 'package:pixez/models/illust.dart';
 import 'package:pixez/network/api_client.dart';
+import 'package:pixez/network/oauth_client.dart';
 import 'package:pixez/page/about/languages.dart';
+import 'package:pixez/secure_plugin.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 part 'user_setting.g.dart';
@@ -34,6 +39,7 @@ class UserSetting = _UserSetting with _$UserSetting;
 abstract class _UserSetting with Store {
   late SharedPreferences prefs;
   static const String ZOOM_QUALITY_KEY = "zoom_quality";
+  static const String FEED_PREVIEW_QUALITY = "feed_preview_quality";
   static const String SINGLE_FOLDER_KEY = "single_folder";
   static const String SAVE_FORMAT_KEY = "save_format";
   static const String LANGUAGE_NUM_KEY = "language_num";
@@ -49,7 +55,7 @@ abstract class _UserSetting with Store {
   static const String THEME_MODE_KEY = "theme_mode";
   static const String SAVE_MODE_KEY = "save_mode";
   static const String NOVEL_FONT_SIZE_KEY = "novel_font_size";
-  static const String IS_RETURN_AGAIN_TO_EXIT_KEY = "is_return_again_to_exit";
+  static const String IS_RETURN_AGAIN_TO_EXIT_KEY = "return_again_to_exit";
   static const String IS_CLEAR_OLD_FORMAT_FILE_KEY = "is_clear_old_format_file";
   static const String IS_FOLLOW_AFTER_STAR = "is_follow_after_star";
   static const String IS_OVER_SANITY_LEVEL_FOLDER =
@@ -74,7 +80,12 @@ abstract class _UserSetting with Store {
   static const String SEED_COLOR_KEY = "seed_color";
   static const String SWIPE_CHANGE_ARTWORK_KEY = "swipe_change_artwork";
   static const String USE_SAUNCE_NAO_WEBVIEW = "use_sauce_nao_webview";
+  static const String FEED_AI_BADGE_KEY = "feed_ai_badge";
+  static const String ILLUST_DETAIL_SAVE_SKIP_LONG_PRESS_KEY =
+      "illust_detail_save_skip_long_press";
 
+  @observable
+  bool illustDetailSaveSkipLongPress = false;
   @observable
   int crossAdapterWidth = 100;
   @observable
@@ -91,7 +102,7 @@ abstract class _UserSetting with Store {
   @observable
   bool isClearOldFormatFile = false;
   @observable
-  bool isReturnAgainToExit = true;
+  bool isReturnAgainToExit = false;
   @observable
   bool? isHelplessWay = false;
   @observable
@@ -104,6 +115,8 @@ abstract class _UserSetting with Store {
   bool isBangs = false;
   @observable
   int zoomQuality = 0;
+  @observable
+  int feedPreviewQuality = 0;
   @observable
   int pictureQuality = 0;
   @observable
@@ -166,10 +179,17 @@ abstract class _UserSetting with Store {
   bool swipeChangeArtwork = false;
   @observable
   bool useSaunceNaoWebview = false;
-
   @observable
   String? format = "";
+  @observable
+  bool feedAIBadge = false;
   static const String intialFormat = "{illust_id}_p{part}";
+
+  @action
+  setFeedAIBadge(bool value) async {
+    await prefs.setBool(FEED_AI_BADGE_KEY, value);
+    feedAIBadge = value;
+  }
 
   @action
   setCrossAdapt(bool value) async {
@@ -241,14 +261,6 @@ abstract class _UserSetting with Store {
   setFileNameEval(int value) async {
     await prefs.setInt("file_name_eval", value);
     fileNameEval = value;
-  }
-
-  Color _stringToColor(String colorString) {
-    String valueString =
-        colorString.split('(0x')[1].split(')')[0]; // kind of hacky..
-    int value = int.parse(valueString, radix: 16);
-    Color otherColor = new Color(value);
-    return otherColor;
   }
 
   @observable
@@ -334,8 +346,14 @@ abstract class _UserSetting with Store {
   }
 
   @action
+  setIllustDetailSaveSkipLongPress(bool v) async {
+    await prefs.setBool(ILLUST_DETAIL_SAVE_SKIP_LONG_PRESS_KEY, v);
+    illustDetailSaveSkipLongPress = v;
+  }
+
+  @action
   askInit() async {
-    prefs = await SharedPreferences.getInstance();
+    prefs = await Prefer.getInstance();
     int themeModeIndex = prefs.getInt(THEME_MODE_KEY) ?? 0;
     for (var i in ThemeMode.values) {
       if (i.index == themeModeIndex) {
@@ -354,7 +372,11 @@ abstract class _UserSetting with Store {
     }
     isAMOLED = prefs.getBool(IS_AMOLED_KEY) ?? false;
     languageNum = prefs.getInt(LANGUAGE_NUM_KEY) ?? 0;
+    disableBypassSni = prefs.getBool('disable_bypass_sni') ?? false;
     ApiClient.Accept_Language = languageList[languageNum];
+    await PixivImage.generatePixivCache();
+    await oAuthClient.createDioClient();
+    await apiClient.createDioClient();
     apiClient.httpClient.options.headers[HttpHeaders.acceptLanguageHeader] =
         ApiClient.Accept_Language;
     locale = iSupportedLocales[languageNum];
@@ -367,15 +389,21 @@ abstract class _UserSetting with Store {
     crossCount = prefs.getInt(CROSS_COUNT_KEY) ?? 2;
     hCrossCount = prefs.getInt(H_CROSS_COUNT_KEY) ?? 4;
     welcomePageNum = prefs.getInt('welcome_page_num') ?? 0;
-    disableBypassSni = prefs.getBool('disable_bypass_sni') ?? false;
+    feedAIBadge = prefs.getBool(FEED_AI_BADGE_KEY) ?? true;
     padMode = prefs.getInt(PAD_MODE_KEY) ?? 0;
+    pictureSource = disableBypassSni
+        ? ImageHost
+        : (prefs.getString(PICTURE_SOURCE_KEY) ?? ImageHost);
+    await Hoster.initMap();
     themeInitState = 1;
+    fetcher.start(pictureSource!);
   }
 
   @action
   Future<void> init() async {
-    prefs = await SharedPreferences.getInstance();
+    prefs = await Prefer.getInstance();
     zoomQuality = prefs.getInt(ZOOM_QUALITY_KEY) ?? 0;
+    feedPreviewQuality = prefs.getInt(FEED_PREVIEW_QUALITY) ?? 0;
     singleFolder = prefs.getBool(SINGLE_FOLDER_KEY) ?? false;
     displayMode = prefs.getInt('display_mode');
     hIsNotAllow = prefs.getBool('h_is_not_allow') ?? false;
@@ -384,7 +412,7 @@ abstract class _UserSetting with Store {
     isBangs = prefs.getBool(IS_BANGS_KEY) ?? false;
     isHelplessWay = prefs.getBool(ISHELPLESSWAY_KEY);
     maxRunningTask = prefs.getInt(MAX_RUNNING_TASK_KEY) ?? 2;
-    isReturnAgainToExit = prefs.getBool(IS_RETURN_AGAIN_TO_EXIT_KEY) ?? true;
+    isReturnAgainToExit = prefs.getBool(IS_RETURN_AGAIN_TO_EXIT_KEY) ?? false;
     isClearOldFormatFile = prefs.getBool(IS_CLEAR_OLD_FORMAT_FILE_KEY) ?? false;
     overSanityLevelFolder = prefs.getBool(IS_OVER_SANITY_LEVEL_FOLDER) ?? false;
     followAfterStar = prefs.getBool(IS_FOLLOW_AFTER_STAR) ?? false;
@@ -395,9 +423,7 @@ abstract class _UserSetting with Store {
     novelTextStyle = novelTextStyle.copyWith(fontSize: novelFontsize);
     saveMode = prefs.getInt(SAVE_MODE_KEY) ??
         (isHelplessWay == null ? 0 : (isHelplessWay! ? 2 : 1));
-    pictureSource = disableBypassSni
-        ? ImageHost
-        : (prefs.getString(PICTURE_SOURCE_KEY) ?? ImageHost);
+
     splashStore.setHost(pictureSource!);
     saveEffect = prefs.getInt(SAVE_EFFECT_KEY) ?? 0;
     saveEffectEnable = prefs.getBool(SAVE_EFFECT_ENABLE_KEY) ?? false;
@@ -409,8 +435,11 @@ abstract class _UserSetting with Store {
     imagePickerType = prefs.getInt(IMAGE_PICKER_TYPE_KEY) ?? 0;
     swipeChangeArtwork = prefs.getBool(SWIPE_CHANGE_ARTWORK_KEY) ?? true;
     useSaunceNaoWebview = prefs.getBool(USE_SAUNCE_NAO_WEBVIEW) ?? false;
+    illustDetailSaveSkipLongPress =
+        prefs.getBool(ILLUST_DETAIL_SAVE_SKIP_LONG_PRESS_KEY) ?? false;
     if (Platform.isAndroid) {
       try {
+        await SecurePlugin.configSecureWindow(nsfwMask);
         var modeList = await FlutterDisplayMode.supported;
         if (displayMode != null && modeList.length > displayMode!) {
           await FlutterDisplayMode.setPreferredMode(modeList[displayMode!]);
@@ -445,7 +474,7 @@ abstract class _UserSetting with Store {
 
   @action
   setThemeData(Color data) async {
-    await prefs.setInt(SEED_COLOR_KEY, data.value);
+    await prefs.setInt(SEED_COLOR_KEY, data.toInt());
     seedColor = data;
   }
 
@@ -530,9 +559,16 @@ abstract class _UserSetting with Store {
   }
 
   @action
+  Future<void> changeFeedPreviewQuality(int value) async {
+    await prefs.setInt(FEED_PREVIEW_QUALITY, value);
+    feedPreviewQuality = value;
+  }
+
+  @action
   Future<void> changeNsfwMask(bool value) async {
     await prefs.setBool(NSFW_MASK_KEY, value);
     nsfwMask = value;
+    await SecurePlugin.configSecureWindow(value);
   }
 
   @action

@@ -19,23 +19,17 @@ import 'dart:io';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
-import 'package:fluent_ui/fluent_ui.dart' hide NestedScrollView;
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pixez/fluent/component/context_menu.dart';
-import 'package:pixez/fluent/component/painter_avatar.dart';
-import 'package:pixez/fluent/component/pixiv_image.dart';
 import 'package:pixez/component/null_hero.dart';
 import 'package:pixez/document_plugin.dart';
 import 'package:pixez/er/hoster.dart';
 import 'package:pixez/er/leader.dart';
-import 'package:pixez/exts.dart';
-import 'package:pixez/i18n.dart';
-import 'package:pixez/main.dart';
-import 'package:pixez/models/illust.dart';
+import 'package:pixez/fluent/component/context_menu.dart';
+import 'package:pixez/fluent/component/painter_avatar.dart';
+import 'package:pixez/fluent/component/pixiv_image.dart';
 import 'package:pixez/fluent/page/follow/follow_list.dart';
 import 'package:pixez/fluent/page/report/report_items_page.dart';
 import 'package:pixez/fluent/page/shield/shield_page.dart';
@@ -43,6 +37,10 @@ import 'package:pixez/fluent/page/user/bookmark/bookmark_page.dart';
 import 'package:pixez/fluent/page/user/detail/user_detail.dart';
 import 'package:pixez/fluent/page/user/works/works_page.dart';
 import 'package:pixez/fluent/page/zoom/zoom_page.dart';
+import 'package:pixez/i18n.dart';
+import 'package:pixez/main.dart';
+import 'package:pixez/models/illust.dart';
+import 'package:pixez/network/api_client.dart';
 import 'package:pixez/page/user/user_store.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -59,7 +57,7 @@ class UsersPage extends StatefulWidget {
 }
 
 class _UsersPageState extends State<UsersPage>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late UserStore userStore;
   late ScrollController _scrollController;
   bool backToTopVisible = false;
@@ -67,7 +65,7 @@ class _UsersPageState extends State<UsersPage>
 
   @override
   void initState() {
-    userStore = widget.userStore ?? UserStore(widget.id);
+    userStore = widget.userStore ?? UserStore(widget.id, null, null);
     _scrollController = ScrollController();
     _scrollController.addListener(() {
       if (_scrollController.hasClients) {
@@ -101,6 +99,7 @@ class _UsersPageState extends State<UsersPage>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Observer(builder: (_) {
       if (muteStore.banUserIds.isNotEmpty) {
         if (muteStore.banUserIds
@@ -418,7 +417,7 @@ class _UsersPageState extends State<UsersPage>
             child: Container(
               color: FluentTheme.of(context)
                   .acrylicBackgroundColor
-                  .withOpacity(.5),
+                  .withValues(alpha: 255 * .5),
             ),
           ),
         ),
@@ -432,7 +431,7 @@ class _UsersPageState extends State<UsersPage>
 
   _saveUserBg(String url) async {
     try {
-      final result = await pixivCacheManager.downloadFile(url, authHeaders: {
+      final result = await pixivCacheManager!.downloadFile(url, authHeaders: {
         'referer': 'https://app-api.pixiv.net/',
       });
       final bytes = await result.file.readAsBytes();
@@ -461,15 +460,9 @@ class _UsersPageState extends State<UsersPage>
       String tempFile = (await getTemporaryDirectory()).path + "/$fileName";
       final dio = Dio(BaseOptions(headers: Hoster.header(url: url)));
       if (!userSetting.disableBypassSni) {
-        dio.httpClientAdapter = IOHttpClientAdapter()
-          ..createHttpClient = () {
-            return HttpClient()
-              ..idleTimeout = Duration(seconds: 3)
-              ..badCertificateCallback =
-                  (X509Certificate cert, String host, int port) => true;
-          };
+        dio.httpClientAdapter = await ApiClient.createCompatibleClient();
       }
-      await dio.download(url.toTrueUrl(), tempFile, deleteOnError: true);
+      await dio.download(url, tempFile, deleteOnError: true);
       File file = File(tempFile);
       if (file.existsSync()) {
         await saveStore.saveToGallery(
@@ -486,7 +479,8 @@ class _UsersPageState extends State<UsersPage>
               metaPages: [],
               type: '',
               width: 0,
-              series: Object(),
+              series: null,
+              totalComments: 0,
               totalBookmarks: 0,
               visible: false,
               isMuted: false,
@@ -530,7 +524,6 @@ class _UsersPageState extends State<UsersPage>
         MenuFlyoutItem(
           text: Text(I18n.of(context).show),
           onPressed: () async {
-            Navigator.of(context).pop();
             await Leader.push(
                 context,
                 ZoomPage(
@@ -545,7 +538,6 @@ class _UsersPageState extends State<UsersPage>
           onPressed: () async {
             await _saveUserBg(
                 userStore.userDetail!.profile.background_image_url!);
-            Navigator.of(context).pop();
           },
         ),
       ],
@@ -600,4 +592,7 @@ class _UsersPageState extends State<UsersPage>
           );
         },
       );
+
+  @override
+  bool get wantKeepAlive => true;
 }

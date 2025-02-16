@@ -21,32 +21,27 @@ class _SortGroupState extends State<SortGroup> {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      children: [for (var i in widget.children) _buildChip(i, context)],
-    );
-  }
-
-  Widget _buildChip(String i, BuildContext context) {
-    final bgColor = index == widget.children.indexOf(i)
-        ? Colors.white
-        : Theme.of(context).textTheme.bodyLarge!.color;
-    return ElevatedButton(
-      child: Text(
-        i,
-        style: TextStyle(color: bgColor),
-      ),
-      style: ButtonStyle(
-          backgroundColor: MaterialStateProperty.all<Color>(
-              index == widget.children.indexOf(i)
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).cardColor)),
-      onPressed: () {
-        int ii = widget.children.indexOf(i);
-        widget.onChange(ii);
+    return SegmentedButton(
+      style: ButtonStyle(backgroundColor:
+          WidgetStateProperty.resolveWith((Set<WidgetState> states) {
+        if (states.contains(WidgetState.disabled)) {
+          return null;
+        }
+        if (states.contains(WidgetState.selected)) {
+          return Theme.of(context).colorScheme.secondaryContainer;
+        }
+        return Theme.of(context).colorScheme.surface;
+      })),
+      segments: [
+        for (var (index, i) in widget.children.indexed)
+          ButtonSegment(value: index, label: Text(i)),
+      ],
+      selected: {index},
+      onSelectionChanged: (p0) {
+        widget.onChange(p0.first);
         if (mounted)
           setState(() {
-            this.index = ii;
+            this.index = p0.first;
           });
       },
     );

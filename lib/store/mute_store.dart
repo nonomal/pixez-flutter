@@ -15,15 +15,19 @@
  */
 
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:fluent_ui/fluent_ui.dart';
 import 'package:mobx/mobx.dart';
 import 'package:pixez/er/lprinter.dart';
+import 'package:pixez/er/prefer.dart';
+import 'package:pixez/er/sharer.dart';
 import 'package:pixez/models/ban_comment_persist.dart';
 import 'package:pixez/models/ban_illust_id.dart';
 import 'package:pixez/models/ban_tag.dart';
 import 'package:pixez/models/ban_user_id.dart';
 import 'package:pixez/models/comment_response.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pixez/saf_plugin.dart';
 
 part 'mute_store.g.dart';
 
@@ -46,15 +50,13 @@ abstract class _MuteStoreBase with Store {
 
   @action
   Future<void> changeBanAI(bool value) async {
-    var instance = await SharedPreferences.getInstance();
-    await instance.setBool("ban_ai_illust", value);
+    await Prefer.setBool("ban_ai_illust", value);
     banAIIllust = value;
   }
 
   @action
   Future<void> fetchBanAI() async {
-    var instance = await SharedPreferences.getInstance();
-    final result = instance.getBool("ban_ai_illust") ?? false;
+    final result = Prefer.getBool("ban_ai_illust") ?? false;
     banAIIllust = result;
   }
 
@@ -144,31 +146,60 @@ abstract class _MuteStoreBase with Store {
     await fetchBanIllusts();
   }
 
-  export() async {
+  export(BuildContext context) async {
     await banUserIdProvider.open();
     await banIllustIdProvider.open();
     await banTagProvider.open();
     final banIllust = await banIllustIdProvider.getAllAccount();
     final banUser = await banUserIdProvider.getAllAccount();
     final banTag = await banTagProvider.getAllAccount();
-    banTags.map((e) => e.toJson()).toList();
     var entity = {
-      "banillustid": banillusts,
-      "banuserid": banUserIds,
-      "bantag": banTags
+      "banillustid": banIllust,
+      "banuserid": banUser,
+      "bantag": banTag
     };
     final exportJson = jsonEncode(entity);
-    LPrinter.d("exportJson:$exportJson");
+    final uint8List = utf8.encode(exportJson);
+    if (Platform.isIOS) {
+      await Sharer.exportUint8List(context, uint8List,
+          "pixez_mute_${DateTime.now().toIso8601String()}.json");
+    } else {
+      final uri = await SAFPlugin.createFile(
+          "pixez_mute_${DateTime.now().toIso8601String()}.json",
+          "application/json");
+      LPrinter.d("exportJson:$exportJson");
+      if (uri != null) {
+        await SAFPlugin.writeUri(uri, uint8List);
+      }
+    }
   }
 
-  import() async {
-    final importStr = "";
-    await banUserIdProvider.open();
-    await banIllustIdProvider.open();
-    await banTagProvider.open();
-    final importBean = jsonDecode(importStr);
-    final importMap = importBean as Map<String, dynamic>;
-    final illustId = importMap['banillustid'];
-    //TODO
+  importFile() async {
+    final uri = await SAFPlugin.openFile();
+    if (uri != null) {
+      final data = utf8.decode(uri);
+      final entity = jsonDecode(data);
+      final banIllust = entity["banillustid"];
+      final banUser = entity["banuserid"];
+      final banTag = entity["bantag"];
+      await banIllustIdProvider.open();
+      await banUserIdProvider.open();
+      await banTagProvider.open();
+      if (banIllust is List) {
+        await banIllustIdProvider.insertAll(
+            banIllust.map((e) => BanIllustIdPersist.fromJson(e)).toList());
+      }
+      if (banUser is List) {
+        await banUserIdProvider.insertAll(
+            banUser.map((e) => BanUserIdPersist.fromJson(e)).toList());
+      }
+      if (banTag is List) {
+        await banTagProvider
+            .insertAll(banTag.map((e) => BanTagPersist.fromJson(e)).toList());
+      }
+      await fetchBanIllusts();
+      await fetchBanUserIds();
+      await fetchBanTags();
+    }
   }
 }

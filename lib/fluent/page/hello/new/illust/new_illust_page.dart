@@ -33,7 +33,8 @@ class NewIllustPage extends StatefulWidget {
   _NewIllustPageState createState() => _NewIllustPageState();
 }
 
-class _NewIllustPageState extends State<NewIllustPage> {
+class _NewIllustPageState extends State<NewIllustPage>
+    with AutomaticKeepAliveClientMixin {
   late ApiForceSource futureGet;
   late StreamSubscription<String> subscription;
   late ScrollController _scrollController;
@@ -61,6 +62,7 @@ class _NewIllustPageState extends State<NewIllustPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Stack(
       children: [
         LightingList(
@@ -125,7 +127,6 @@ class _NewIllustPageState extends State<NewIllustPage> {
                   MenuFlyoutItem(
                     text: Text(I18n.of(context).all),
                     onPressed: () {
-                      Navigator.of(context).pop();
                       setState(() {
                         futureGet = ApiForceSource(
                           futureGet: (e) => apiClient.getFollowIllusts(
@@ -140,7 +141,6 @@ class _NewIllustPageState extends State<NewIllustPage> {
                   MenuFlyoutItem(
                     text: Text(I18n.of(context).public),
                     onPressed: () {
-                      Navigator.of(context).pop();
                       setState(() {
                         futureGet = ApiForceSource(
                           futureGet: (e) => apiClient.getFollowIllusts(
@@ -155,7 +155,6 @@ class _NewIllustPageState extends State<NewIllustPage> {
                   MenuFlyoutItem(
                     text: Text(I18n.of(context).private),
                     onPressed: () {
-                      Navigator.of(context).pop();
                       setState(() {
                         futureGet = ApiForceSource(
                           futureGet: (e) => apiClient.getFollowIllusts(
@@ -175,4 +174,7 @@ class _NewIllustPageState extends State<NewIllustPage> {
       ),
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }

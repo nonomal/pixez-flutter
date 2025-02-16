@@ -29,6 +29,7 @@
 .pub/
 /build/
 **/*.g.dart
+**/*.freezed.dart
 /lib/generated/
 
 # Android related
@@ -81,3 +82,7 @@ msic
 
 # Ignore Certificate
 *.pfx
+
+# FVM Version Cache
+.fvm/
+/lib/src/generated/

@@ -7,6 +7,7 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
+import 'package:pixez/clipboard_plugin.dart';
 import 'package:pixez/fluent/component/context_menu.dart';
 import 'package:pixez/fluent/component/pixiv_image.dart';
 import 'package:pixez/i18n.dart';
@@ -47,7 +48,7 @@ class _PhotoZoomPageState extends State<PhotoZoomPage> {
   }
 
   initCache() async {
-    var fileInfo = await pixivCacheManager.getFileFromCache(nowUrl);
+    var fileInfo = await pixivCacheManager!.getFileFromCache(nowUrl);
     if (mounted)
       setState(() {
         shareShow = fileInfo != null;
@@ -114,7 +115,7 @@ class _PhotoZoomPageState extends State<PhotoZoomPage> {
                 _index = index;
                 shareShow = false;
               });
-              var file = await pixivCacheManager.getFileFromCache(nowUrl);
+              var file = await pixivCacheManager!.getFileFromCache(nowUrl);
               if (file != null && mounted)
                 setState(() {
                   shareShow = true;
@@ -170,6 +171,21 @@ class _PhotoZoomPageState extends State<PhotoZoomPage> {
                     onPressed: () async {
                       Navigator.of(context).pop();
                     }),
+                IconButton(
+                  icon: Icon(
+                    FluentIcons.copy,
+                    color: Colors.white,
+                  ),
+                  onPressed: () async {
+                    final url = ClipboardPlugin.getImageUrl(_illusts, _index);
+                    if (url == null) return;
+
+                    ClipboardPlugin.showToast(
+                      context,
+                      ClipboardPlugin.copyImageFromUrl(url),
+                    );
+                  },
+                ),
                 ContextMenu(
                   child: IconButton(
                     icon: Icon(
@@ -192,7 +208,6 @@ class _PhotoZoomPageState extends State<PhotoZoomPage> {
                               index: _index);
                         else
                           await saveStore.saveImage(widget.illusts);
-                        Navigator.of(context).pop();
                       },
                     )
                   ],
@@ -207,7 +222,7 @@ class _PhotoZoomPageState extends State<PhotoZoomPage> {
                       ),
                       onPressed: () async {
                         var file =
-                            await pixivCacheManager.getFileFromCache(nowUrl);
+                            await pixivCacheManager!.getFileFromCache(nowUrl);
                         if (file != null) {
                           String targetPath = join(
                               (await getTemporaryDirectory()).path,

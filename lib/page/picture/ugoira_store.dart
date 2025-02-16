@@ -18,7 +18,6 @@ import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:mobx/mobx.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pixez/er/hoster.dart';
@@ -26,7 +25,6 @@ import 'package:pixez/er/lprinter.dart';
 import 'package:pixez/main.dart';
 import 'package:pixez/models/ugoira_metadata_response.dart';
 import 'package:pixez/network/api_client.dart';
-import 'package:pixez/exts.dart';
 import 'package:pixez/saf_plugin.dart';
 
 part 'ugoira_store.g.dart';
@@ -131,18 +129,13 @@ abstract class _UgoiraStoreBase with Store {
     try {
       ugoiraMetadataResponse = await apiClient.getUgoiraMetadata(id);
       String zipUrl =
-          ugoiraMetadataResponse!.ugoiraMetadata.zipUrls.medium.toTrueUrl();
+          ugoiraMetadataResponse!.ugoiraMetadata.zipUrls.medium;
       if (!fullPathFile.existsSync()) {
         var dio = Dio(BaseOptions(
             headers: Hoster.header(
                 url: ugoiraMetadataResponse!.ugoiraMetadata.zipUrls.medium)));
         if (!userSetting.disableBypassSni) {
-          dio.httpClientAdapter = IOHttpClientAdapter()
-            ..onHttpClientCreate = (client) {
-              client.badCertificateCallback =
-                  (X509Certificate cert, String host, int port) => true;
-              return client;
-            };
+          dio.httpClientAdapter = await ApiClient.createCompatibleClient();
         }
         dio.download(zipUrl, fullPath,
             onReceiveProgress: (int count, int total) {

@@ -28,23 +28,22 @@ import 'package:pixez/component/null_hero.dart';
 import 'package:pixez/component/painter_avatar.dart';
 import 'package:pixez/component/pixez_default_header.dart';
 import 'package:pixez/component/pixiv_image.dart';
-import 'package:pixez/component/selectable_html.dart';
 import 'package:pixez/component/star_icon.dart';
 import 'package:pixez/er/leader.dart';
 import 'package:pixez/er/lprinter.dart';
-import 'package:pixez/exts.dart';
 import 'package:pixez/i18n.dart';
 import 'package:pixez/main.dart';
 import 'package:pixez/models/ban_illust_id.dart';
 import 'package:pixez/models/ban_tag.dart';
 import 'package:pixez/models/illust.dart';
-import 'package:pixez/page/comment/comment_page.dart';
 import 'package:pixez/page/picture/illust_about_store.dart';
+import 'package:pixez/page/picture/illust_detail_content.dart';
 import 'package:pixez/page/picture/illust_row_page.dart';
 import 'package:pixez/page/picture/illust_store.dart';
 import 'package:pixez/page/picture/picture_list_page.dart';
 import 'package:pixez/page/picture/tag_for_illust_page.dart';
 import 'package:pixez/page/picture/ugoira_loader.dart';
+import 'package:pixez/page/picture/user_follow_button.dart';
 import 'package:pixez/page/report/report_items_page.dart';
 import 'package:pixez/page/search/result_page.dart';
 import 'package:pixez/page/user/user_store.dart';
@@ -145,8 +144,7 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
     _scrollController = ScrollController();
     _illustStore = widget.store ?? IllustStore(widget.id, null);
     _illustStore.fetch();
-    _aboutStore =
-        IllustAboutStore(widget.id, refreshController: _refreshController);
+    _aboutStore = IllustAboutStore(widget.id, _refreshController);
     super.initState();
     supportTranslateCheck();
   }
@@ -157,7 +155,7 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
     if (oldWidget.store != widget.store) {
       _illustStore = widget.store ?? IllustStore(widget.id, null);
       _illustStore.fetch();
-      _aboutStore = IllustAboutStore(widget.id);
+      _aboutStore = IllustAboutStore(widget.id, _refreshController);
       LPrinter.d("state change");
     }
   }
@@ -165,9 +163,10 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
   void _loadAbout() {
     if (mounted &&
         _scrollController.hasClients &&
-        _scrollController.offset + 220 >=
-            _scrollController.position.maxScrollExtent &&
-        _aboutStore.illusts.isEmpty) _aboutStore.fetch();
+        _aboutStore.illusts.isEmpty &&
+        !_aboutStore.fetching) {
+      _aboutStore.next();
+    }
   }
 
   @override
@@ -263,6 +262,7 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
                     if (userSetting.followAfterStar) {
                       bool success = await _illustStore.followAfterStar();
                       if (success) {
+                        userStore?.isFollow = true;
                         BotToast.showText(
                             text:
                                 "${_illustStore.illusts!.user.name} ${I18n.of(context).followed}");
@@ -334,7 +334,6 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
   }
 
   bool supportTranslate = false;
-  String _selectedText = "";
 
   Future<void> supportTranslateCheck() async {
     if (!Platform.isAndroid) return;
@@ -346,42 +345,12 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
     }
   }
 
-  AdaptiveTextSelectionToolbar _buildSelectionMenu(
-      SelectableRegionState editableTextState, BuildContext context) {
-    final List<ContextMenuButtonItem> buttonItems =
-        editableTextState.contextMenuButtonItems;
-    if (supportTranslate) {
-      buttonItems.insert(
-        buttonItems.length,
-        ContextMenuButtonItem(
-          label: I18n.of(context).translate,
-          onPressed: () async {
-            final selectionText = _selectedText;
-            if (Platform.isIOS) {
-              final box = context.findRenderObject() as RenderBox?;
-              final pos = box != null
-                  ? box.localToGlobal(Offset.zero) & box.size
-                  : null;
-              Share.share(selectionText, sharePositionOrigin: pos);
-              return;
-            }
-            await SupportorPlugin.start(selectionText);
-            ContextMenuController.removeAny();
-          },
-        ),
-      );
-    }
-    return AdaptiveTextSelectionToolbar.buttonItems(
-      anchors: editableTextState.contextMenuAnchors,
-      buttonItems: buttonItems,
-    );
-  }
-
   Widget colorText(String text, BuildContext context) {
     return SelectionArea(
       child: Text(
         text,
-        style: TextStyle(color: Theme.of(context).colorScheme.secondary),
+        style: TextStyle(
+            color: Theme.of(context).colorScheme.secondary, fontSize: 12),
       ),
     );
   }
@@ -398,6 +367,7 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
           ),
         ),
       );
+    if (userStore == null) userStore = UserStore(data.user.id, null, data.user);
     return EasyRefresh(
       controller: _refreshController,
       header: PixezDefault.header(context),
@@ -413,187 +383,13 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
                 child: Container(height: MediaQuery.of(context).padding.top)),
           ..._buildPhotoList(data),
           SliverToBoxAdapter(
-            child: _buildNameAvatar(context, data),
-          ),
-          SliverToBoxAdapter(
-            child: Container(
-              margin: EdgeInsets.symmetric(horizontal: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SelectionArea(
-                    child: Text(
-                      data.title,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
-                  SizedBox(
-                    height: 8,
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: <Widget>[
-                      Container(child: Text(I18n.of(context).illust_id)),
-                      Container(
-                        width: 10.0,
-                      ),
-                      colorText(data.id.toString(), context),
-                      Container(
-                        width: 20.0,
-                      ),
-                      Container(child: Text(I18n.of(context).pixel)),
-                      Container(
-                        width: 10.0,
-                      ),
-                      colorText("${data.width}x${data.height}", context)
-                    ],
-                  ),
-                  Container(
-                    height: 4,
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: <Widget>[
-                      Icon(
-                        Icons.remove_red_eye,
-                        color: Theme.of(context).textTheme.bodySmall!.color,
-                        size: 16,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 2.0),
-                        child: Text(data.totalView.toString(),
-                            style: Theme.of(context).textTheme.bodySmall),
-                      ),
-                      Container(
-                        width: 4.0,
-                      ),
-                      Icon(
-                        Icons.favorite,
-                        color: Theme.of(context).textTheme.bodySmall!.color,
-                        size: 16.0,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 2.0),
-                        child: Text("${data.totalBookmarks}",
-                            style: Theme.of(context).textTheme.bodySmall),
-                      ),
-                      Container(
-                        width: 4.0,
-                      ),
-                      Icon(
-                        Icons.timelapse_rounded,
-                        color: Theme.of(context).textTheme.bodySmall!.color,
-                        size: 16.0,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 2.0),
-                        child: Text(data.createDate.toShortTime(),
-                            style: Theme.of(context).textTheme.bodySmall),
-                      )
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 8.0, right: 8.0, top: 8.0),
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 12,
-                runSpacing: 6,
-                children: [
-                  if (data.illustAIType == 2)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius:
-                            const BorderRadius.all(Radius.circular(8)),
-                      ),
-                      child: RichText(
-                          textAlign: TextAlign.start,
-                          text: TextSpan(
-                              text: "${I18n.of(context).ai_generated}",
-                              children: [
-                                TextSpan(
-                                  text: " ",
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleSmall!
-                                      .copyWith(fontSize: 12),
-                                ),
-                              ],
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall!
-                                  .copyWith(
-                                      color: Colors.white, fontSize: 12))),
-                    ),
-                  for (var f in data.tags) buildRow(context, f)
-                ],
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Container(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12),
-                child: SelectionArea(
-                  focusNode: _focusNode,
-                  onSelectionChanged: (value) {
-                    _selectedText = value?.plainText ?? "";
-                  },
-                  contextMenuBuilder: (context, selectableRegionState) {
-                    return _buildSelectionMenu(selectableRegionState, context);
-                  },
-                  child: SelectableHtml(
-                    data: data.caption.isEmpty ? "~" : data.caption,
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(left: 0.0),
-              child: SelectionContainer.disabled(
-                child: TextButton(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: Icon(
-                          Icons.comment,
-                          size: 16,
-                        ),
-                      ),
-                      Text(
-                        I18n.of(context).view_comment,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(MaterialPageRoute(
-                        builder: (BuildContext context) => CommentPage(
-                              id: data.id,
-                            )));
-                  },
-                ),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(I18n.of(context).about_picture),
+            child: IllustDetailContent(
+              illusts: data,
+              userStore: userStore,
+              illustStore: _illustStore,
+              loadAbout: () {
+                _loadAbout();
+              },
             ),
           ),
           SliverGrid(
@@ -681,16 +477,9 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
             ? SliverList(
                 delegate: SliverChildBuilderDelegate(
                     (BuildContext context, int index) {
-                String url = userSetting.pictureQuality == 1
-                    ? data.imageUrls.large
-                    : data.imageUrls.medium;
+                String url = data.illustDetailUrl;
                 if (data.type == "manga") {
-                  if (userSetting.mangaQuality == 0)
-                    url = data.imageUrls.medium;
-                  else if (userSetting.mangaQuality == 1)
-                    url = data.imageUrls.large;
-                  else
-                    url = data.metaSinglePage!.originalImageUrl!;
+                  url = data.managaDetailUrl;
                 }
                 Widget placeWidget = Container(height: height);
                 return InkWell(
@@ -773,13 +562,7 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
 
   Widget _buildIllustsItem(int index, Illusts illust, double height) {
     if (illust.type == "manga") {
-      String url;
-      if (userSetting.mangaQuality == 0)
-        url = illust.metaPages[index].imageUrls!.medium;
-      else if (userSetting.mangaQuality == 1)
-        url = illust.metaPages[index].imageUrls!.large;
-      else
-        url = illust.metaPages[index].imageUrls!.original;
+      String url = illust.managaDetailImageUrl(index);
       if (index == 0)
         return NullHero(
           child: PixivImage(
@@ -808,10 +591,10 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
       );
     }
     return index == 0
-        ? (userSetting.pictureQuality == 1
+        ? (userSetting.pictureQuality >= 1
             ? NullHero(
                 child: PixivImage(
-                  illust.metaPages[index].imageUrls!.large,
+                  illust.illustDetailImageUrl(index),
                   placeWidget: PixivImage(
                     illust.metaPages[index].imageUrls!.medium,
                     fade: false,
@@ -828,9 +611,7 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
                 tag: widget.heroString,
               ))
         : PixivImage(
-            userSetting.pictureQuality == 0
-                ? illust.metaPages[index].imageUrls!.medium
-                : illust.metaPages[index].imageUrls!.large,
+            illust.illustDetailImageUrl(index),
             fade: false,
             placeWidget: Container(
               height: 150,
@@ -847,7 +628,18 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
         context: context,
         builder: (BuildContext context) {
           return SimpleDialog(
-            title: Text(f.name),
+            title: RichText(
+              text: TextSpan(children: [
+                TextSpan(
+                    text: "${f.name}",
+                    style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                        color: Theme.of(context).colorScheme.primary)),
+                if (f.translatedName != null)
+                  TextSpan(
+                      text: "\n${"${f.translatedName}"}",
+                      style: Theme.of(context).textTheme.bodyLarge!)
+              ]),
+            ),
             children: <Widget>[
               SimpleDialogOption(
                 onPressed: () {
@@ -906,116 +698,86 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
         }));
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        height: 25,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.secondaryContainer,
-          borderRadius: const BorderRadius.all(Radius.circular(8)),
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: const BorderRadius.all(Radius.circular(12.5)),
         ),
-        child: RichText(
-            textAlign: TextAlign.start,
-            text: TextSpan(
-                text: "#${f.name}",
-                children: [
-                  TextSpan(
-                    text: " ",
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall!
-                        .copyWith(fontSize: 12),
-                  ),
-                  TextSpan(
-                      text: "${f.translatedName ?? "~"}",
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall!
-                          .copyWith(fontSize: 12))
-                ],
-                style: Theme.of(context).textTheme.titleSmall!.copyWith(
-                    color: Theme.of(context).colorScheme.secondary,
-                    fontSize: 12))),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            RichText(
+                textAlign: TextAlign.start,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                text: TextSpan(
+                    text: "#${f.name}",
+                    children: [
+                      TextSpan(
+                        text: " ",
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall!
+                            .copyWith(fontSize: 12),
+                      ),
+                      if (f.translatedName != null)
+                        TextSpan(
+                            text: "${f.translatedName}",
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall!
+                                .copyWith(fontSize: 12))
+                    ],
+                    style: Theme.of(context).textTheme.titleSmall!.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 12))),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildNameAvatar(BuildContext context, Illusts illust) {
     if (userStore == null)
-      userStore = UserStore(illust.user.id, user: illust.user);
+      userStore = UserStore(illust.user.id, null, illust.user);
     return Observer(builder: (_) {
       Future.delayed(Duration(seconds: 2), () {
         _loadAbout();
       });
       return InkWell(
         onTap: () async {
-          await Leader.push(
-              context,
-              UsersPage(
-                id: illust.user.id,
-                userStore: userStore,
-                heroTag: this.hashCode.toString(),
-              ));
-          _illustStore.illusts!.user.isFollowed = userStore!.isFollow;
-        },
-        onLongPress: () {
-          userStore!.follow();
+          await _push2UserPage(context, illust);
         },
         child: Row(
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
             Padding(
-                child: GestureDetector(
-                  onLongPress: () {
-                    userStore!.follow();
-                  },
-                  child: Container(
-                    height: 32,
-                    width: 32,
-                    child: Stack(
-                      children: <Widget>[
-                        Center(
-                          child: SizedBox(
-                            height: 32,
-                            width: 32,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: userStore!.isFollow
-                                    ? Colors.yellow
-                                    : Theme.of(context).colorScheme.secondary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Center(
-                          child: Hero(
-                            tag: illust.user.profileImageUrls.medium +
-                                this.hashCode.toString(),
-                            child: PainterAvatar(
-                              url: illust.user.profileImageUrls.medium,
-                              id: illust.user.id,
-                              size: Size(28, 28),
-                              onTap: () async {
-                                await Leader.push(
-                                    context,
-                                    UsersPage(
-                                      id: illust.user.id,
-                                      userStore: userStore,
-                                      heroTag: this.hashCode.toString(),
-                                    ));
-                                _illustStore.illusts!.user.isFollowed =
-                                    userStore!.isFollow;
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                child: Hero(
+                  tag: illust.user.profileImageUrls.medium +
+                      this.hashCode.toString(),
+                  child: PainterAvatar(
+                    url: illust.user.profileImageUrls.medium,
+                    id: illust.user.id,
+                    size: Size(32, 32),
+                    onTap: () async {
+                      await Leader.push(
+                          context,
+                          UsersPage(
+                            id: illust.user.id,
+                            userStore: userStore,
+                            heroTag: this.hashCode.toString(),
+                          ));
+                      _illustStore.illusts!.user.isFollowed =
+                          userStore!.isFollow;
+                    },
                   ),
                 ),
-                padding: EdgeInsets.all(8.0)),
+                padding: EdgeInsets.only(left: 16.0)),
             Expanded(
               child: Padding(
-                padding: EdgeInsets.all(8.0),
+                padding: EdgeInsets.all(12.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -1026,6 +788,7 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
                         child: Text(
                           illust.user.name,
                           style: TextStyle(
+                              fontSize: 14,
                               color:
                                   Theme.of(context).textTheme.bodySmall!.color),
                         ),
@@ -1035,13 +798,44 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
                 ),
               ),
             ),
+            UserFollowButton(
+              followed: userStore?.isFollow ?? illust.user.isFollowed ?? false,
+              onPressed: () async {
+                await userStore?.follow();
+                if (userStore?.isFollow != null) {
+                  _illustStore.illusts?.user.isFollowed = userStore?.isFollow;
+                }
+              },
+            ),
+            SizedBox(
+              width: 12,
+            )
           ],
         ),
       );
     });
   }
 
+  Future<void> _push2UserPage(BuildContext context, Illusts illust) async {
+    await Leader.push(
+        context,
+        UsersPage(
+          id: illust.user.id,
+          userStore: userStore,
+          heroTag: this.hashCode.toString(),
+        ));
+    _illustStore.illusts!.user.isFollowed = userStore!.isFollow;
+  }
+
   Future<void> _pressSave(Illusts illust, int index) async {
+    if (userSetting.illustDetailSaveSkipLongPress) {
+      saveStore.saveImage(illust, index: index);
+      if (userSetting.starAfterSave && (_illustStore.state == 0)) {
+        _illustStore.star(
+            restrict: userSetting.defaultPrivateLike ? "private" : "public");
+      }
+      return;
+    }
     showModalBottomSheet(
         context: context,
         shape: RoundedRectangleBorder(
@@ -1238,6 +1032,9 @@ class _IllustVerticalPageState extends State<IllustVerticalPage>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
+                  SizedBox(
+                    height: 8,
+                  ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.start,

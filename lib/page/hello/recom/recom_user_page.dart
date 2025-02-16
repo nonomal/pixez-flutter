@@ -13,13 +13,13 @@
  *  this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 import 'package:easy_refresh/easy_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:pixez/component/painer_card.dart';
 import 'package:pixez/i18n.dart';
 import 'package:pixez/page/hello/recom/recom_user_store.dart';
+import 'package:waterfall_flow/waterfall_flow.dart';
 
 class RecomUserPage extends StatefulWidget {
   final RecomUserStore? recomUserStore;
@@ -39,7 +39,7 @@ class _RecomUserPageState extends State<RecomUserPage> {
     _refreshController = EasyRefreshController(
         controlFinishLoad: true, controlFinishRefresh: true);
     _recomUserStore =
-        widget.recomUserStore ?? RecomUserStore(controller: _refreshController);
+        widget.recomUserStore ?? RecomUserStore(_refreshController);
     if (widget.recomUserStore != null) {
       _recomUserStore.controller = _refreshController;
     }
@@ -65,16 +65,24 @@ class _RecomUserPageState extends State<RecomUserPage> {
           onRefresh: () => _recomUserStore.fetch(),
           onLoad: () => _recomUserStore.next(),
           refreshOnStart: widget.recomUserStore == null,
-          child: ListView.builder(
-              itemCount: _recomUserStore.users.length,
-              itemBuilder: (context, index) {
-                final data = _recomUserStore.users[index];
-                return PainterCard(
-                  user: data,
-                );
-              }),
+          child: _buildList(),
         ),
       );
     });
+  }
+
+  Widget _buildList() {
+    return WaterfallFlow.builder(
+      gridDelegate: SliverWaterfallFlowDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 600,
+      ),
+      itemCount: _recomUserStore.users.length,
+      itemBuilder: (context, index) {
+        final data = _recomUserStore.users[index];
+        return PainterCard(
+          user: data,
+        );
+      },
+    );
   }
 }

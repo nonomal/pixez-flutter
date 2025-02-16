@@ -42,7 +42,7 @@ class _NetworkPageState extends State<NetworkPage> {
             AppBar(
               backgroundColor: Colors.transparent,
               iconTheme: IconThemeData(
-                  color: Theme.of(context).textTheme.bodyText1!.color),
+                  color: Theme.of(context).textTheme.bodyLarge!.color),
               automaticallyImplyLeading: _automaticallyImplyLeading,
               elevation: 0.0,
             ),
@@ -50,14 +50,14 @@ class _NetworkPageState extends State<NetworkPage> {
               padding: const EdgeInsets.all(8.0),
               child: Text(
                 I18n.of(context).network,
-                style: Theme.of(context).textTheme.headline5,
+                style: Theme.of(context).textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
             ),
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0),
               child: Text(
-                "tip:如果不能载图，可以尝试切换图床，你可以在设置页重新回到这里",
+                I18n.of(context).network_tip,
                 style: TextStyle(
                   fontSize: 12.0,
                   color: Colors.grey,
@@ -118,7 +118,7 @@ class _NetworkPageState extends State<NetworkPage> {
                           I18n.of(context).image_site,
                           style: TextStyle(
                               color:
-                                  Theme.of(context).textTheme.bodyText1!.color),
+                                  Theme.of(context).textTheme.bodyLarge!.color),
                         ),
                         trailing: IconButton(
                           icon: Icon(Icons.refresh_outlined),
@@ -152,7 +152,7 @@ class _NetworkPageState extends State<NetworkPage> {
                           ImageCatHost,
                           style: TextStyle(
                               color:
-                                  Theme.of(context).textTheme.bodyText1!.color),
+                                  Theme.of(context).textTheme.bodyLarge!.color),
                         ),
                         selected: userSetting.pictureSource == ImageCatHost,
                         selectedTileColor:
@@ -181,10 +181,8 @@ class _NetworkPageState extends State<NetworkPage> {
                                   if (_textEditingController.text.isEmpty)
                                     return;
                                   if (_textEditingController.text
-                                          .contains("/") ||
-                                      _textEditingController.text
-                                          .trim()
-                                          .contains(" ")) {
+                                      .trim()
+                                      .contains(" ")) {
                                     ScaffoldMessenger.of(context)
                                         .showSnackBar(SnackBar(
                                       content: Text("illegal"),
@@ -202,7 +200,7 @@ class _NetworkPageState extends State<NetworkPage> {
                                   color: Colors.black,
                                 ),
                               ),
-                              labelText: 'Custom Host',
+                              labelText: I18n.of(context).custom_host,
                             ),
                           ),
                         ),

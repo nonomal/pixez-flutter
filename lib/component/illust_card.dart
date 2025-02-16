@@ -22,15 +22,18 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:pixez/component/null_hero.dart';
 import 'package:pixez/component/pixiv_image.dart';
 import 'package:pixez/component/star_icon.dart';
+import 'package:pixez/constants.dart';
 import 'package:pixez/er/lprinter.dart';
+import 'package:pixez/er/prefer.dart';
 import 'package:pixez/i18n.dart';
 import 'package:pixez/lighting/lighting_store.dart';
 import 'package:pixez/main.dart';
+import 'package:pixez/models/illust.dart';
 import 'package:pixez/page/picture/illust_lighting_page.dart';
 import 'package:pixez/page/picture/illust_store.dart';
 import 'package:pixez/page/picture/picture_list_page.dart';
 import 'package:pixez/page/picture/tag_for_illust_page.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pixez/page/series/illust_series_page.dart';
 
 class IllustCard extends StatefulWidget {
   final IllustStore store;
@@ -76,7 +79,7 @@ class _IllustCardState extends State<IllustCard> {
   Widget build(BuildContext context) {
     if (userSetting.hIsNotAllow)
       for (int i = 0; i < store.illusts!.tags.length; i++) {
-        if (store.illusts!.tags[i].name.startsWith('R-18'))
+        if (store.illusts!.tags[i].name.startsWith('R-18')) {
           return InkWell(
             onTap: () => _buildTap(context),
             onLongPress: () => _onLongPressSave(),
@@ -86,11 +89,12 @@ class _IllustCardState extends State<IllustCard> {
               clipBehavior: Clip.antiAlias,
               shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadius.all(Radius.circular(8.0))),
-              child: Image.asset('assets/images/h.jpg'),
+              child: Image.asset(Constants.no_h),
             ),
           );
+        }
       }
-    return buildInkWell(context);
+    return _buildInkWell(context);
   }
 
   _onLongPressSave() async {
@@ -165,12 +169,12 @@ class _IllustCardState extends State<IllustCard> {
           )
         : NullHero(
             tag: tag,
-            child: PixivImage(store.illusts!.imageUrls.medium,
-                fit: BoxFit.fitWidth),
+            child:
+                PixivImage(store.illusts!.feedPreviewUrl, fit: BoxFit.fitWidth),
           );
   }
 
-  Widget buildInkWell(BuildContext context) {
+  Widget _buildInkWell(BuildContext context) {
     var tooLong =
         store.illusts!.height.toDouble() / store.illusts!.width.toDouble() > 3;
     var radio = (tooLong)
@@ -190,13 +194,69 @@ class _IllustCardState extends State<IllustCard> {
                     children: [
                       Positioned.fill(child: _buildPic(tag, tooLong)),
                       Positioned(
-                          top: 5.0, right: 5.0, child: _buildVisibility()),
+                          top: 5.0,
+                          right: 5.0,
+                          child: Row(
+                            children: [
+                              if (userSetting.feedAIBadge &&
+                                  store.illusts!.illustAIType == 2)
+                                _buildAIBadge(),
+                              _buildVisibility()
+                            ],
+                          )),
+                      // Positioned(
+                      //   top: 0,
+                      //   left: 0,
+                      //   child: CustomPaint(
+                      //     size: Size(36, 36),
+                      //     painter: TrianglePainter(),
+                      //   ),
+                      // ),
                     ],
                   )),
-              _buildBottom(context),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildBottom(context),
+                  if (store.illusts?.series != null) ...[
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => IllustSeriesPage(
+                                  id: store.illusts!.series!.id,
+                                )));
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                          margin: EdgeInsets.only(left: 8, bottom: 4),
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '${store.illusts?.series?.title ?? ''}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          )),
+                    )
+                  ]
+                ],
+              ),
             ],
           ),
         ));
+  }
+
+  Widget _buildAIBadge() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black26,
+        borderRadius: BorderRadius.all(Radius.circular(4.0)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 2.0),
+        child: Text(
+          "AI",
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
+    );
   }
 
   Widget _buildAnimationWraper(BuildContext context, Widget child) {
@@ -213,10 +273,9 @@ class _IllustCardState extends State<IllustCard> {
 
   _buildLongPressToSaveHint() async {
     if (Platform.isIOS) {
-      final pref = await SharedPreferences.getInstance();
-      final firstLongPress = await pref.getBool("first_long_press") ?? true;
+      final firstLongPress = await Prefer.getBool("first_long_press") ?? true;
       if (firstLongPress) {
-        await pref.setBool("first_long_press", false);
+        await Prefer.setBool("first_long_press", false);
         await showDialog(
             context: context,
             builder: (context) {
@@ -237,8 +296,8 @@ class _IllustCardState extends State<IllustCard> {
     _onLongPressSave();
   }
 
-  Future _buildInkTap(BuildContext context, String heroTag) {
-    return Navigator.of(context, rootNavigator: true)
+  Future<void> _buildInkTap(BuildContext context, String heroTag) async {
+    await Navigator.of(context, rootNavigator: true)
         .push(MaterialPageRoute(builder: (_) {
       if (iStores != null) {
         return PictureListPage(
@@ -354,5 +413,28 @@ class _IllustCardState extends State<IllustCard> {
         ),
       ),
     );
+  }
+}
+
+class TrianglePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    var paint = Paint()
+      ..color = Colors.yellow
+      ..style = PaintingStyle.fill;
+
+    var path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(size.width, 0);
+    path.lineTo(0, size.height);
+    path.lineTo(0, 0);
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) {
+    return false;
   }
 }

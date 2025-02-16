@@ -19,8 +19,10 @@ import 'dart:ffi';
 import 'package:bot_toast/bot_toast.dart';
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:pixez/clipboard_plugin.dart';
 import 'package:pixez/component/null_hero.dart';
 import 'package:pixez/component/star_icon.dart';
+import 'package:pixez/constants.dart';
 import 'package:pixez/er/leader.dart';
 import 'package:pixez/er/lprinter.dart';
 import 'package:pixez/fluent/component/pixez_button.dart';
@@ -85,20 +87,47 @@ class _IllustCardState extends State<IllustCard> {
       child: _build(context),
       items: [
         MenuFlyoutItem(
-          text: Text('Like'),
+          leading: Observer(builder: (context) {
+            switch (store.state) {
+              case 0:
+                return Icon(FluentIcons.heart);
+              case 1:
+                return Icon(FluentIcons.heart_fill);
+              default:
+                return Icon(
+                  FluentIcons.heart_fill,
+                  color: Colors.red,
+                );
+            }
+          }),
+          text: Text(I18n.of(context).bookmark),
           onPressed: () async {
             await _onStar();
-            Navigator.of(context).pop();
           },
         ),
+        if (ClipboardPlugin.supported)
+          MenuFlyoutItem(
+            leading: Icon(FluentIcons.copy),
+            text: Text(I18n.of(context).copy),
+            onPressed: () async {
+              final url = ClipboardPlugin.getImageUrl(store.illusts!, 0);
+              if (url == null) return;
+
+              ClipboardPlugin.showToast(
+                context,
+                ClipboardPlugin.copyImageFromUrl(url),
+              );
+            },
+          ),
         MenuFlyoutItem(
+          leading: Icon(FluentIcons.save),
           text: Text(I18n.of(context).save),
           onPressed: () async {
             await _onSave();
-            Navigator.of(context).pop();
           },
         ),
         MenuFlyoutItem(
+          leading: Icon(FluentIcons.favorite_list),
           text: Text(I18n.of(context).favorited_tag),
           onPressed: () async {
             final result = await showDialog<dynamic>(
@@ -111,7 +140,6 @@ class _IllustCardState extends State<IllustCard> {
               List<String>? tags = result['tags'];
               store.star(restrict: restrict, tags: tags, force: true);
             }
-            Navigator.of(context).pop();
           },
         ),
       ],
@@ -125,7 +153,7 @@ class _IllustCardState extends State<IllustCard> {
       if (iR18 != null && iR18 != -1) {
         return PixEzButton(
           onPressed: () => _buildTap(context),
-          child: Image.asset('assets/images/h.jpg'),
+          child: Image.asset(Constants.no_h),
         );
       }
     }

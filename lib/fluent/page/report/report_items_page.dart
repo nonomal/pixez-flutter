@@ -48,7 +48,7 @@ class _ReportItemsPageState extends State<ReportItemsPage> {
                 final title = items[index];
                 return Container(
                   color: index == _selectItem
-                      ? FluentTheme.of(context).accentColor.withOpacity(0.5)
+                      ? FluentTheme.of(context).accentColor.withValues(alpha: 255 * 0.5)
                       : Colors.transparent,
                   child: ListTile(
                     title: Text(title),
@@ -72,9 +72,9 @@ class _ReportItemsPageState extends State<ReportItemsPage> {
                   await widget.onSubmit();
                   BotToast.closeAllLoading();
                   Navigator.of(context).pop();
-                  BotToast.showText(text: "Thanks for your feedback");
+                  BotToast.showText(text: I18n.ofContext().thanks_for_your_feedback);
                 },
-                child: Text("Submit"),
+                child: Text(I18n.ofContext().submit),
               ),
             ),
           )

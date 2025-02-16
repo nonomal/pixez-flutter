@@ -29,6 +29,7 @@ class _SaveEvalPageState extends State<SaveEvalPage> {
         large:
             "https://i.pximg.net/c/540x540_70/img-master/img/2020/12/31/00/00/00/84800000_p0_master1200.jpg",
       ),
+      totalComments: 1,
       caption: "caption",
       restrict: 0,
       user: User(
@@ -100,7 +101,7 @@ class _SaveEvalPageState extends State<SaveEvalPage> {
           children: [
             ListTile(
               title: Text("File Name:"),
-              subtitle: Text(_fileName ?? "undifined"),
+              subtitle: Text(_fileName ?? "undefined"),
             ),
             Padding(
               padding: const EdgeInsets.all(16.0),

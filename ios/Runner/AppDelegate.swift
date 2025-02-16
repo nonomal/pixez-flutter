@@ -3,7 +3,7 @@ import Flutter
 import MobileCoreServices
 import Photos
 
-@UIApplicationMain
+@main
 @objc class AppDelegate: FlutterAppDelegate {
     override func application(
         _ application: UIApplication,
@@ -26,7 +26,6 @@ import Photos
             self.receiveBatteryLevel(result: result,path: path ,delay: delay)
             
         })
-        WidgetkitPlugin.bind(controller: controller)
         DocumentPlugin.bind(controller:controller)
         GeneratedPluginRegistrant.register(with: self)
         DeepLinkPlugin.register(with: self.registrar(forPlugin: "DeepLinkPlugin")!)

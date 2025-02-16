@@ -19,7 +19,7 @@ class _RecomUserRoadState extends State<RecomUserRoad> {
 
   @override
   void initState() {
-    _recomUserStore = widget.recomUserStore ?? RecomUserStore()
+    _recomUserStore = widget.recomUserStore ?? RecomUserStore(null)
       ..fetch();
     super.initState();
   }
@@ -32,7 +32,7 @@ class _RecomUserRoadState extends State<RecomUserRoad> {
       child: ButtonTheme(
         data: ButtonThemeData(
           iconButtonStyle: ButtonStyle(
-            padding: ButtonState.all(EdgeInsets.zero),
+            padding: WidgetStateProperty.all(EdgeInsets.zero),
           ),
         ),
         child: IconButton(
